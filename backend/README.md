@@ -5,6 +5,7 @@ A working example of the backend the dashboard expects. It implements **all 13 e
 - **Python 3.9+**
 - FastAPI + SQLAlchemy 2. Works with SQLite (default), PostgreSQL, SQL Server or Oracle.
 - Interactive API docs at **http://localhost:8000/docs** once it's running.
+- **Real request/response examples** for every endpoint: [../API_EXAMPLES.md](../API_EXAMPLES.md). To regenerate them after changing the server, start it and run `python tools/make_examples.py`.
 
 ## Run it
 

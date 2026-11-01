@@ -77,6 +77,10 @@ src/
 
 `backend/` holds a working **FastAPI example server** that implements the whole contract, with an example database. See [backend/README.md](backend/README.md).
 
+What the dashboard sends and receives:
+- [API_CONTRACT.md](API_CONTRACT.md): the rules
+- [API_EXAMPLES.md](API_EXAMPLES.md): real request/response examples for every endpoint
+
 ## Not designed yet
 
 - The פרטי מלש"ב and משתמשים pages are placeholders

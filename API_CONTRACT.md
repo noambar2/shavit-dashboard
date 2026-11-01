@@ -4,6 +4,7 @@ This is everything the frontend needs from the backend (13 endpoints). The UI al
 
 - **TypeScript source of truth:** [`src/api/types.ts`](src/api/types.ts)
 - **Where each endpoint is called:** [`src/api/dashboard.ts`](src/api/dashboard.ts)
+- **Real request/response examples for every endpoint:** [`API_EXAMPLES.md`](API_EXAMPLES.md), captured from the example server in `backend/`
 - **Example responses:** [`src/mocks/data.ts`](src/mocks/data.ts) (the fake data has exactly the shapes below)
 
 ## General rules

@@ -7,7 +7,9 @@ This folder holds two things:
 | **Frontend** | `shavit-dashboard/` (this folder) | The Vue dashboard. It runs on fake data until connected. |
 | **Example backend** | `shavit-dashboard/backend/` | A FastAPI server that already implements every endpoint, with an example database. Start from it, or use it as a reference. |
 
-The full API definition is in **[API_CONTRACT.md](API_CONTRACT.md)**. The backend is documented in **[backend/README.md](backend/README.md)**.
+- **[API_CONTRACT.md](API_CONTRACT.md):** the rules: every endpoint, its params and fields.
+- **[API_EXAMPLES.md](API_EXAMPLES.md):** real examples: for each endpoint, exactly what the dashboard sends and the JSON it gets back.
+- **[backend/README.md](backend/README.md):** how the example server works and how to connect the real database.
 
 ---
 
@@ -19,7 +21,7 @@ The full API definition is in **[API_CONTRACT.md](API_CONTRACT.md)**. The backen
 | --- | --- |
 | `src/`, `index.html`, `package.json`, **`package-lock.json`**, `vite.config.ts`, `tsconfig*.json`, `.env.example`, `public/`, `.github/` | `node_modules/`: 130+ MB, rebuilt by `npm ci`, and contains Mac-only binaries |
 | `backend/` (code, `requirements.txt`, `seed.py`, README) | `dist/`: build output |
-| `API_CONTRACT.md`, `README.md`, `HANDOFF.md` | `.env` (personal settings), `backend/.venv/`, `backend/*.db`, `__pycache__/`, `.DS_Store` |
+| `API_CONTRACT.md`, `API_EXAMPLES.md`, `README.md`, `HANDOFF.md` | `.env` (personal settings), `backend/.venv/`, `backend/*.db`, `__pycache__/`, `.DS_Store` |
 
 To rebuild the zip, run this from the folder that **contains** `shavit-dashboard`:
 
