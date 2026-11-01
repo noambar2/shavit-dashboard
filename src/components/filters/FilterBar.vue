@@ -76,6 +76,7 @@ onMounted(() => store.loadOptions())
     </div>
 
     <div v-if="activeChips.length" class="chips">
+      <span class="chips-label">סינונים פעילים:</span>
       <span v-for="chip in activeChips" :key="chip.key" class="chip">
         {{ chip.label }}
         <button type="button" :aria-label="`הסרת סינון ${chip.label}`" @click="store.setFilter(chip.key, undefined)">
@@ -170,6 +171,11 @@ onMounted(() => store.loadOptions())
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+.chips-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-medium);
 }
 .chip {
   display: inline-flex;
