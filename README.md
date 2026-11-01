@@ -44,15 +44,38 @@ src/
 2. Each card calls `useDashboardData(loader)`. Whenever the filters change, or the user presses refresh (🔄), the card calls its function in `api/dashboard.ts` with the full filter object.
 3. `api/dashboard.ts` returns mock data while `VITE_USE_MOCKS=true`, and calls the real endpoint otherwise.
 
-## Implemented from the Figma
+## Features
 
-- Navbar with tabs and a candidate search that suggests results as you type
-- Filter bar: filter menu (collapsible radio groups, with search where the design has it), כלל מיטב / לשכות / מפקדה toggle, day / month / year date picker, active filter chips, clear all, refresh
-- KPI cards. Clicking a donut slice or legend row filters the whole dashboard; the other slices fade and a reset (איפוס סינונים) button appears
-- מסגרות: stacked bars, drill-down with breadcrumbs, a משימות / ציונים toggle, detailed tooltips
-- התפתחות היסטורית: smooth lines, משימות / ציונים toggle
-- משימות table: expand/collapse rows, fullscreen view, show/hide columns, search rows, ⓘ indicator tooltip, דוח שמי download
-- Loading and error (retry) states on every card
+- **Navbar:** tabs, candidate search that suggests results as you type, and (fake-data mode only) a מנהלן / משתמש רגיל test toggle
+- **Filter bar:**
+  - an icon filter menu: collapsible radio groups with search and a visible scrollbar
+  - the כלל מיטב / לשכות / מפקדה toggle
+  - a date picker for a day, a whole month or a whole year
+  - labelled active-filter chips
+  - refresh, with a "נתונים עדכניים ל…" timestamp
+- **Admin announcements:** banners on the home page. Admins create, edit and delete them with an expiry date; regular users can hide one until the next page load.
+- **KPI cards:** clicking a donut slice or legend row filters the whole dashboard. Large totals are shortened (373K), with the exact number on hover.
+- **מסגרות:** stacked bars or score bars, drill-down with breadcrumbs, scrolls sideways when crowded
+- **התפתחות היסטורית:** ציון, ציון אב and a dashed ממוצע line (in משימות mode, משימות and משימות אב)
+- **משימות table:**
+  - a tree of any depth
+  - a generic per-column filter
+  - show/hide columns
+  - clickable counts and an eye icon that open the in-app report view
+  - Excel export: a דוח שמי, or a דוח מרוכז (summary sheet plus one sheet per lowest-level row)
+- **Report view:**
+  - סוג משימה chips with counts
+  - search
+  - per-column filters
+  - sorting and paging
+  - Excel export of exactly what's shown
+  - a shareable link (`?report=…&type=…`)
+- **Full screen** for the table and both charts
+- **Layouts:** wide (1280px and up) and narrow, plus loading and error (retry) states on every card
+
+## Backend
+
+`backend/` holds a working **FastAPI example server** that implements the whole contract, with an example database. See [backend/README.md](backend/README.md).
 
 ## Not designed yet
 
