@@ -13,6 +13,9 @@ class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
+# int stays int in the JSON (81), float stays float (79.1).
+Number = Union[int, float]
+
 TaskStatusKey = Literal["treatment", "nearBreach", "breach", "paused"]
 RatingKey = Literal["high", "medium", "low"]
 ClassificationKey = Literal["processes", "routine"]
@@ -42,13 +45,13 @@ class Segment(CamelModel):
 
 class Distribution(CamelModel):
     total: int
-    change_pct: Optional[float] = None
+    change_pct: Optional[Number] = None
     segments: List[Segment]
 
 
 class Score(CamelModel):
-    value: float
-    change_pct: float
+    value: Number
+    change_pct: Number
 
 
 class KpiSummary(CamelModel):
@@ -64,9 +67,9 @@ class FrameworkItem(CamelModel):
     id: str
     name: str
     has_children: bool
-    total: float
+    total: Number
     breakdown: Optional[Dict[str, int]] = None
-    score: Optional[float] = None
+    score: Optional[Number] = None
 
 
 class BreadcrumbItem(CamelModel):
@@ -83,7 +86,7 @@ class FrameworksResponse(CamelModel):
 
 class HistoryPoint(CamelModel):
     date: str
-    value: float
+    value: Number
 
 
 class HistorySeries(CamelModel):
@@ -108,9 +111,9 @@ class TaskRow(CamelModel):
     paused: int
     total: int
     sla: Optional[int]
-    weight_pct: float
-    score: Optional[float]
-    trend_pct: Optional[float]
+    weight_pct: Number
+    score: Optional[Number]
+    trend_pct: Optional[Number]
     has_report: bool
     children: Optional[List["TaskRow"]] = None
 

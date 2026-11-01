@@ -190,7 +190,7 @@ def tasks_table(f: DashboardFilters = Depends(dashboard_filters), db: Session = 
             paused=counts["paused"],
             total=sum(counts.values()),
             sla=fw.sla_days,
-            weight_pct=fw.weight_pct,
+            weight_pct=int(fw.weight_pct) if float(fw.weight_pct).is_integer() else fw.weight_pct,
             score=round(score) if score is not None else None,
             trend_pct=pct_change(score, prev) if score is not None and prev and score != prev else None,
             has_report=True,
