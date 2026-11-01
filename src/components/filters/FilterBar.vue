@@ -56,13 +56,14 @@ onMounted(() => store.loadOptions())
       <button v-if="!activeChips.length" type="button" class="clear" @click="store.clearAll()">נקה הכל</button>
 
       <div class="end">
-        <slot name="end" />
         <span v-if="lastUpdated" class="updated" aria-live="polite">
           {{ pending ? 'מרענן נתונים…' : 'נתונים עדכניים ל-' }}<span v-if="!pending" class="num">{{ formatDateTime(lastUpdated) }}</span>
         </span>
         <button type="button" class="icon-btn" :class="{ spinning: pending }" aria-label="רענון נתונים" @click="store.refresh()">
           <AppIcon name="refresh" :size="16" />
         </button>
+        <!-- Last in the DOM = far left in RTL -->
+        <slot name="end" />
       </div>
     </div>
 
