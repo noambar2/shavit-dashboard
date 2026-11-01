@@ -28,15 +28,6 @@ onMounted(() => store.loadOptions())
 <template>
   <div class="filter-bar">
     <div class="row">
-      <div ref="menuRoot" class="menu-anchor">
-        <button type="button" class="filters-btn" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
-          <AppIcon name="filter" :size="16" />
-          סינונים
-          <span v-if="activeChips.length" class="count">{{ activeChips.length }}</span>
-        </button>
-        <FilterMenu v-if="menuOpen" />
-      </div>
-
       <div class="scopes" role="radiogroup" aria-label="היקף">
         <button
           v-for="s in SCOPES"
@@ -52,6 +43,23 @@ onMounted(() => store.loadOptions())
       </div>
 
       <DatePicker />
+
+      <!-- Same round icon button as refresh; sits to the left of the date (after it in RTL). -->
+      <div ref="menuRoot" class="menu-anchor">
+        <button
+          type="button"
+          class="icon-btn"
+          :class="{ on: activeChips.length }"
+          :aria-expanded="menuOpen"
+          aria-label="סינונים"
+          title="סינונים"
+          @click="menuOpen = !menuOpen"
+        >
+          <AppIcon name="filter" :size="16" />
+          <span v-if="activeChips.length" class="count">{{ activeChips.length }}</span>
+        </button>
+        <FilterMenu v-if="menuOpen" />
+      </div>
 
       <button v-if="!activeChips.length" type="button" class="clear" @click="store.clearAll()">נקה הכל</button>
 
@@ -93,27 +101,26 @@ onMounted(() => store.loadOptions())
 .menu-anchor {
   position: relative;
 }
-.filters-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 16px;
-  border-radius: var(--radius-sm);
+.menu-anchor .icon-btn {
+  position: relative;
+}
+/* Active filters: filled button + count badge (same as the table's filter button). */
+.icon-btn.on {
   background: var(--main-blue);
   color: #fff;
-  font-weight: 600;
 }
 .count {
-  display: grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #fff;
-  color: var(--main-blue);
-  font-size: 11px;
+  background: var(--error);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
 }
 .scopes {
   display: flex;
