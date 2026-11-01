@@ -58,3 +58,13 @@ src/
 
 - The פרטי מלש"ב and משתמשים pages are placeholders
 - The ⓘ texts on card titles are placeholder copy in `src/constants/colors.ts`
+
+## Deploy (GitHub Pages)
+
+Live at **https://noambar2.github.io/shavit-dashboard/**, running on the mock data.
+
+This folder is published to its own repo, [noambar2/shavit-dashboard](https://github.com/noambar2/shavit-dashboard). Every push to `main` there runs `.github/workflows/deploy.yml`, which builds the app and deploys it. To publish changes from the parent repo:
+
+```bash
+git push https://github.com/noambar2/shavit-dashboard.git "$(git subtree split --prefix shavit-dashboard)":main
+```
