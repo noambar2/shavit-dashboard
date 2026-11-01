@@ -265,6 +265,9 @@ export interface AnnouncementInput {
 // Excel reports — דוח שמי (named) and דוח מרוכז (consolidated)
 // ---------------------------------------------------------------------------
 
+/** סוג משימה, derived from `daysToBreach` and `pauseEndDate` (see src/config.ts). */
+export type ReportTaskType = 'breach' | 'nearBreach' | 'treatment' | 'paused'
+
 /** How a report column is written to Excel: dates become real date cells, numbers stay numeric. */
 export type ReportColumnType = 'text' | 'number' | 'date'
 
@@ -294,4 +297,37 @@ export type ReportTask = Record<string, string | number | null>
 export interface ReportTasksResponse {
   columns: ReportColumn[]
   rows: { rowId: string; tasks: ReportTask[] }[]
+}
+
+/**
+ * GET /reports/tasks/page — one page of the in-app report view (דוח שמי shown in the system).
+ * Same rows as GET /reports/tasks, but filtered, sorted and paged on the server.
+ */
+export interface ReportPageQuery {
+  /** 1-based. */
+  page: number
+  pageSize: number
+  /** A column `key` (or `taskType`). */
+  sortKey?: string
+  sortDir?: 'asc' | 'desc'
+  /** Only tasks of this סוג משימה. */
+  taskType?: ReportTaskType
+  /** Free-text search (at least: מספר אישי). */
+  q?: string
+  /** Only tasks of this lowest-level row (the מסגרת filter in a consolidated view). */
+  leafRowId?: string
+  /** Exact-match filters on text columns: `{ corps: 'תקשוב' }` → `f.corps=תקשוב`. */
+  columnFilters?: Record<string, string>
+}
+
+export interface ReportPage {
+  columns: ReportColumn[]
+  /** Number of tasks matching every filter (for paging). */
+  total: number
+  /** Counts per סוג משימה, matching every filter except `taskType` (for the chips). */
+  typeCounts: Record<ReportTaskType, number>
+  /** Distinct values per text column (for the column filter menu). */
+  facets: Record<string, string[]>
+  /** The tasks on this page; `rowId` says which lowest-level row each belongs to. */
+  tasks: (ReportTask & { rowId: string })[]
 }

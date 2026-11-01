@@ -1,6 +1,6 @@
 # מלש"ביה Dashboard — API Contract
 
-This is everything the frontend needs from the backend (12 endpoints). The UI already works against fake data. Once these endpoints exist, set `VITE_USE_MOCKS=false` and it switches over with no code changes.
+This is everything the frontend needs from the backend (13 endpoints). The UI already works against fake data. Once these endpoints exist, set `VITE_USE_MOCKS=false` and it switches over with no code changes.
 
 - **TypeScript source of truth:** [`src/api/types.ts`](src/api/types.ts)
 - **Where each endpoint is called:** [`src/api/dashboard.ts`](src/api/dashboard.ts)
@@ -354,6 +354,52 @@ The response has one entry in `rows` per lowest-level row under `rowId`. If `row
 The **5** is `NEAR_BREACH_DAYS` in `src/config.ts`. Change it there, and **use the same number on the server** when counting tasks for the dashboard, otherwise the dashboard and Excel won't agree.
 
 While the file is being built, the user sees "מרכזים עבורכם את הדוחות…". A failed request shows an error message with a retry option.
+
+## 7b. Report view inside the system (paged)
+
+`GET /reports/tasks/page?{filters}&rowId={row id}&page=&pageSize=&...`
+
+This endpoint powers the **in-app report view**, the same דוח שמי shown inside the dashboard instead of downloaded. The user opens it in either of two ways:
+- the eye icon in the "דוח" column;
+- clicking a count in the table, such as "1,732" under משימות בחריגה. That opens the view already filtered to that סוג משימה. Clicking a סה"כ count opens it unfiltered.
+
+The tasks are the same as in section 7 (same `columns`, same task objects), but the **server filters, sorts and pages** them, because a report can have thousands of lines.
+
+| Param | Meaning |
+| --- | --- |
+| `rowId` | The table row, which can be at any level. For a row with children, return the tasks of **every lowest-level row** under it. |
+| `page`, `pageSize` | Paging (1-based). The UI uses 25, 50 or 100. When exporting the filtered view to Excel, it requests `page=1&pageSize={total}`. |
+| `sortKey`, `sortDir` | A column `key` (or `taskType`) and `asc`/`desc`. Omitted = your default order. |
+| `taskType` | `breach` \| `nearBreach` \| `treatment` \| `paused`. Same rules as section 7 (`NEAR_BREACH_DAYS`). |
+| `q` | Free-text search. Match at least מספר אישי; matching other text columns too is welcome. |
+| `leafRowId` | Only tasks of this lowest-level row (the מסגרת filter in a consolidated view). |
+| `f.{key}` | Exact-match filter on a text column, e.g. `f.corps=תקשוב`. Several can be combined. |
+
+Plus all the usual dashboard filters (scope, date, etc.).
+
+```json
+{
+  "columns": [ { "key": "startDate", "label": "תאריך תחילה", "type": "date" } ],
+  "total": 1732,
+  "typeCounts": { "breach": 1732, "nearBreach": 181, "treatment": 42, "paused": 0 },
+  "facets": {
+    "corps": ["אמ\"ן", "הנדסה קרבית", "חיל האוויר", "תקשוב"],
+    "major": ["הנדסת חשמל", "הנדסת מכונות"]
+  },
+  "tasks": [
+    { "rowId": "mitzui-tzav12", "startDate": "2026-10-02", "daysToBreach": -2, "pauseEndDate": null, "personalNumber": "5234567" }
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `total` | How many tasks match **all** filters. The pager uses it ("מציג 1–50 מתוך 1,732"). |
+| `typeCounts` | Counts per סוג משימה, applying every filter **except** `taskType`. These are the numbers on the chips (הכל / בחריגה / עתידה לחרוג / …). |
+| `facets` | Distinct values per **text** column, for the column filter menu. A column with no entry gets no filter. Skip columns with too many values, such as מספר אישי. |
+| `tasks[].rowId` | Which lowest-level row the task belongs to. In a consolidated view, the UI shows it as the מסגרת column. |
+
+Every task still needs `daysToBreach` and `pauseEndDate`. The UI colours the סוג משימה tag from them.
 
 ## 8. Navbar search (חיפוש מלש"ב)
 

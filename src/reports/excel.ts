@@ -7,38 +7,19 @@
  * ExcelJS is loaded on demand, so it doesn't slow down the first page load.
  */
 import type { Workbook, Worksheet } from 'exceljs'
-import type { ReportColumn, ReportTask, TaskRow } from '@/api/types'
-import { NEAR_BREACH_DAYS } from '@/config'
+import type { ReportColumn, ReportTask, ReportTaskType, TaskRow } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
+import { TASK_TYPE_LABELS, taskType } from './taskType'
 
 // ---------------------------------------------------------------------------
-// סוג משימה
+// סוג משימה colours
 // ---------------------------------------------------------------------------
-
-export type ReportTaskType = 'paused' | 'breach' | 'nearBreach' | 'treatment'
-
-export const TASK_TYPE_LABELS: Record<ReportTaskType, string> = {
-  breach: 'משימות בחריגה',
-  nearBreach: 'עתידות לחרוג',
-  treatment: 'משימות לטיפול',
-  paused: 'משימות בהשהייה',
-}
 
 const TASK_TYPE_COLORS: Record<ReportTaskType, string> = {
   breach: 'FFE04A5D',
   nearBreach: 'FFD8891F',
   treatment: 'FF0E9384',
   paused: 'FF3D6DEB',
-}
-
-/** Computed from `daysToBreach` and `pauseEndDate`. See `NEAR_BREACH_DAYS` in src/config.ts. */
-export function taskType(task: ReportTask, today: string): ReportTaskType {
-  const pauseEnd = task.pauseEndDate
-  const days = Number(task.daysToBreach)
-  if (typeof pauseEnd === 'string' && pauseEnd >= today) return 'paused'
-  if (days < 0) return 'breach'
-  if (days <= NEAR_BREACH_DAYS) return 'nearBreach'
-  return 'treatment'
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +189,7 @@ function descendants(row: TaskRow, depth = 1, ancestors: TaskRow[] = []): { row:
  * Sheet names for the lowest-level rows. A name used more than once gets the closest ancestor
  * that tells the rows apart, e.g. "משרד ירושלים - ראיונות אישיים" vs "משרד חיפה - ראיונות אישיים".
  */
-function leafSheetTitles(leaves: { row: TaskRow; ancestors: TaskRow[] }[]): Map<string, string> {
+export function leafSheetTitles(leaves: { row: TaskRow; ancestors: TaskRow[] }[]): Map<string, string> {
   const titles = new Map<string, string>()
   const byName = new Map<string, typeof leaves>()
   for (const l of leaves) byName.set(l.row.name, [...(byName.get(l.row.name) ?? []), l])
@@ -237,6 +218,32 @@ export interface ReportContext {
 }
 
 export const isLeaf = (row: TaskRow) => !row.children?.length
+
+/** Display name for every lowest-level row under `row` (repeated names get their distinguishing ancestor). */
+export function leafTitlesUnder(row: TaskRow): Map<string, string> {
+  if (isLeaf(row)) return new Map([[row.id, row.name]])
+  return leafSheetTitles(descendants(row).filter((r) => isLeaf(r.row)))
+}
+
+/**
+ * A single-sheet דוח שמי of exactly the tasks given — used by the in-app report view to export
+ * what's on screen (after its filters). `extraColumns` (e.g. מסגרת) come right after סוג משימה.
+ */
+export async function buildListReport(
+  name: string,
+  columns: ReportColumn[],
+  tasks: ReportTask[],
+  ctx: ReportContext,
+): Promise<{ blob: Blob; filename: string }> {
+  const { default: ExcelJS } = await import('exceljs')
+  const wb = new ExcelJS.Workbook()
+  wb.creator = 'מלש"ביה'
+  wb.created = new Date()
+  const meta = `הופק: ${formatDateTime(new Date())} · ${ctx.filtersLabel}`
+  addNamedSheet(wb, { name } as TaskRow, tasks, columns, meta, ctx.today)
+  const day = ctx.today.split('-').reverse().join('-')
+  return { blob: await toBlob(wb), filename: `דוח שמי - ${name} - ${day}.xlsx` }
+}
 
 /** Builds the workbook for `row` and returns it as an .xlsx Blob plus a file name. */
 export async function buildReport(

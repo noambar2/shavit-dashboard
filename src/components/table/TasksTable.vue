@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getTasks } from '@/api/dashboard'
-import type { Option, TaskRow } from '@/api/types'
+import type { Option, ReportTaskType, TaskRow } from '@/api/types'
 import { useDashboardData } from '@/composables/useFetch'
 import { useClickOutside } from '@/composables/useClickOutside'
 import { formatNumber, scoreColor } from '@/utils/format'
@@ -11,6 +12,7 @@ import HoverTip from '@/components/common/HoverTip.vue'
 import FilterAccordion, { type FilterSection } from '@/components/filters/FilterAccordion.vue'
 import IndicatorTooltip from './IndicatorTooltip.vue'
 import ReportToast from './ReportToast.vue'
+import ReportView from '@/components/report/ReportView.vue'
 import { useReportExport } from '@/composables/useReportExport'
 
 type ColumnId = 'treatment' | 'nearBreach' | 'breach' | 'paused' | 'total' | 'sla' | 'weightPct' | 'score' | 'trendPct' | 'report'
@@ -25,7 +27,7 @@ const COLUMNS: { id: ColumnId; label: string }[] = [
   { id: 'weightPct', label: 'משקל' },
   { id: 'score', label: 'ציון' },
   { id: 'trendPct', label: 'מגמה' },
-  { id: 'report', label: 'ייצוא לאקסל' },
+  { id: 'report', label: 'דוח' },
 ]
 
 const { data, loading, error, reload } = useDashboardData((f, signal) => getTasks(f, signal))
@@ -128,6 +130,43 @@ function toggleColumn(id: ColumnId) {
 const report = useReportExport()
 const reportLabel = (row: TaskRow) => (row.children?.length ? 'דוח מרוכז' : 'דוח שמי')
 
+// --- In-app report view: opened from the eye icon or by clicking a count ---------------
+// State lives in the URL (?report=<rowId>&type=<taskType>) so links can be shared and Back closes it.
+const route = useRoute()
+const router = useRouter()
+const TASK_TYPE_KEYS: ReportTaskType[] = ['treatment', 'nearBreach', 'breach', 'paused']
+/** Count columns that open the report already filtered to that סוג משימה (סה"כ opens it unfiltered). */
+const COUNT_COLUMNS: Partial<Record<ColumnId, ReportTaskType | null>> = {
+  treatment: 'treatment',
+  nearBreach: 'nearBreach',
+  breach: 'breach',
+  paused: 'paused',
+  total: null,
+}
+
+const reportRow = computed(() => {
+  const id = route.query.report
+  return typeof id === 'string' ? allRows.value.find((r) => r.id === id) : undefined
+})
+const reportType = computed(() => {
+  const t = route.query.type
+  return typeof t === 'string' && (TASK_TYPE_KEYS as string[]).includes(t) ? (t as ReportTaskType) : undefined
+})
+
+function openReport(row: TaskRow, type?: ReportTaskType | null) {
+  router.push({ query: { ...route.query, report: row.id, type: type ?? undefined } })
+}
+function closeReport() {
+  const { report: _r, type: _t, ...rest } = route.query
+  router.push({ query: rest })
+}
+function setReportType(type: ReportTaskType | undefined) {
+  router.replace({ query: { ...route.query, type } })
+}
+
+const isCountColumn = (id: ColumnId) => id in COUNT_COLUMNS
+const canOpen = (row: TaskRow, id: ColumnId) => row.hasReport && Number(row[id as keyof TaskRow]) > 0
+
 function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
   const v = row[id]
   if (id === 'weightPct') return `${v}%`
@@ -205,19 +244,35 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
               </span>
             </td>
             <td v-for="c in shownColumns" :key="c.id" class="num-cell">
-              <template v-if="c.id === 'report'">
-                <HoverTip v-if="row.hasReport" :text="reportLabel(row)" placement="top" :width="90">
-                  <button
-                    type="button"
-                    class="report"
-                    :disabled="report.busy.value"
-                    :aria-label="`ייצוא ${reportLabel(row)} לאקסל: ${row.name}`"
-                    @click="report.exportRow(row)"
-                  >
-                    <AppIcon name="excel" :size="18" />
-                  </button>
-                </HoverTip>
-              </template>
+              <span v-if="c.id === 'report'" class="report-actions">
+                <template v-if="row.hasReport">
+                  <HoverTip :text="`הצגת ${reportLabel(row)}`" placement="top" :width="110">
+                    <button type="button" class="report" :aria-label="`הצגת ${reportLabel(row)}: ${row.name}`" @click="openReport(row)">
+                      <AppIcon name="eye" :size="18" />
+                    </button>
+                  </HoverTip>
+                  <HoverTip :text="`${reportLabel(row)} לאקסל`" placement="top" :width="120">
+                    <button
+                      type="button"
+                      class="report"
+                      :disabled="report.busy.value"
+                      :aria-label="`ייצוא ${reportLabel(row)} לאקסל: ${row.name}`"
+                      @click="report.exportRow(row)"
+                    >
+                      <AppIcon name="excel" :size="18" />
+                    </button>
+                  </HoverTip>
+                </template>
+              </span>
+              <button
+                v-else-if="isCountColumn(c.id) && canOpen(row, c.id)"
+                type="button"
+                class="num count-link"
+                :aria-label="`הצגת ${c.label} – ${row.name}`"
+                @click="openReport(row, COUNT_COLUMNS[c.id])"
+              >
+                {{ cell(row, c.id as Exclude<ColumnId, 'report'>) }}
+              </button>
               <span
                 v-else-if="c.id === 'score'"
                 class="num score"
@@ -245,6 +300,14 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
     </div>
   </DashCard>
   <ReportToast :status="report.status.value" @dismiss="report.dismiss" />
+  <ReportView
+    v-if="reportRow"
+    :key="reportRow.id"
+    :row="reportRow"
+    :initial-type="reportType"
+    @close="closeReport"
+    @update:type="setReportType"
+  />
 </template>
 
 <style scoped>
@@ -387,6 +450,22 @@ tbody tr:hover td {
 }
 .down {
   color: var(--error);
+}
+.report-actions {
+  display: inline-flex;
+  gap: 10px;
+}
+/* Counts that open the report: look like the other numbers until hovered. */
+.count-link {
+  color: inherit;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.count-link:hover {
+  color: var(--main-blue);
+  background: var(--selected-bg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .report {
   display: inline-grid;

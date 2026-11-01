@@ -18,7 +18,10 @@ import type {
   KpiSummary,
   MetricMode,
   ReportColumn,
+  ReportPage,
+  ReportPageQuery,
   ReportTask,
+  ReportTaskType,
   ReportTasksResponse,
   TaskRow,
   TaskStatusKey,
@@ -42,6 +45,7 @@ import {
   type FrameworkNode,
 } from './data'
 import * as announcements from './announcements'
+import { TASK_TYPES, taskType, todayIso } from '@/reports/taskType'
 
 const STATUS_KEYS: TaskStatusKey[] = ['treatment', 'nearBreach', 'breach', 'paused']
 
@@ -206,7 +210,7 @@ function fakeTasks(row: TaskRow, runDate: string): ReportTask[] {
   // Local calendar day (toISOString would shift it by the timezone).
   const iso = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const count = 12 + Math.floor(rand() * 18)
+  const count = 25 + Math.floor(rand() * 40)
   return Array.from({ length: count }, () => {
     const handlingDays = 1 + Math.floor(rand() * 45)
     const start = new Date(run)
@@ -240,6 +244,56 @@ export function getReportTasks(rowId: string, filters: DashboardFilters): Promis
   const rows = leavesOf(row).map((leaf) => ({ rowId: leaf.id, tasks: fakeTasks(leaf, filters.date) }))
   // A bit slower than other calls, so the "preparing your report" message is visible.
   return delay({ columns: REPORT_COLUMNS, rows }, 900 + rows.length * 150)
+}
+
+export function getReportPage(rowId: string, filters: DashboardFilters, query: ReportPageQuery): Promise<ReportPage> {
+  const row = findRow(taskRows, (r) => r.id === rowId)
+  if (!row) return Promise.reject(new Error('404 Not Found'))
+  const today = todayIso()
+  const all: ReportPage['tasks'] = leavesOf(row).flatMap((leaf) =>
+    fakeTasks(leaf, filters.date).map((t) => Object.assign({}, t, { rowId: leaf.id })),
+  )
+
+  // Every filter except סוג משימה (the chips show counts per type under the other filters).
+  const q = query.q?.trim()
+  const base = all.filter(
+    (t) =>
+      (!query.leafRowId || t.rowId === query.leafRowId) &&
+      (!q || Object.values(t).some((v) => v !== null && String(v).includes(q))) &&
+      Object.entries(query.columnFilters ?? {}).every(([k, v]) => String(t[k] ?? '') === v),
+  )
+  const typeCounts = Object.fromEntries(TASK_TYPES.map((k) => [k, 0])) as Record<ReportTaskType, number>
+  for (const t of base) typeCounts[taskType(t, today)]++
+  const matching = query.taskType ? base.filter((t) => taskType(t, today) === query.taskType) : base
+
+  if (query.sortKey) {
+    const dir = query.sortDir === 'desc' ? -1 : 1
+    const key = query.sortKey
+    const value = (t: ReportTask) => (key === 'taskType' ? TASK_TYPES.indexOf(taskType(t, today)) : t[key])
+    matching.sort((a, b) => {
+      const va = value(a)
+      const vb = value(b)
+      if (va === vb) return 0
+      if (va === null || va === undefined) return 1
+      if (vb === null || vb === undefined) return -1
+      return (typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'he')) * dir
+    })
+  }
+
+  // Distinct values per text column; columns with too many (like מספר אישי) get no filter.
+  const MAX_FACET_VALUES = 50
+  const facets = Object.fromEntries(
+    REPORT_COLUMNS.filter((c) => c.type === 'text')
+      .map((c) => [c.key, [...new Set(all.map((t) => t[c.key]).filter((v): v is string => typeof v === 'string' && v !== ''))]] as const)
+      .filter(([, values]) => values.length <= MAX_FACET_VALUES)
+      .map(([key, values]) => [key, [...values].sort((a: string, b: string) => a.localeCompare(b, 'he'))]),
+  )
+
+  const start = (query.page - 1) * query.pageSize
+  return delay(
+    { columns: REPORT_COLUMNS, total: matching.length, typeCounts, facets, tasks: matching.slice(start, start + query.pageSize) },
+    250,
+  )
 }
 
 export function searchCandidates(q: string): Promise<CandidateSearchResult[]> {

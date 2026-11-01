@@ -19,6 +19,8 @@ import type {
   IndicatorDetails,
   KpiSummary,
   MetricMode,
+  ReportPage,
+  ReportPageQuery,
   ReportTasksResponse,
   TasksResponse,
 } from './types'
@@ -81,6 +83,19 @@ export function getIndicator(id: string, signal?: AbortSignal): Promise<Indicato
 export function getReportTasks(rowId: string, filters: DashboardFilters): Promise<ReportTasksResponse> {
   if (USE_MOCKS) return mock.getReportTasks(rowId, filters)
   return getJson('/reports/tasks', { ...filterQuery(filters), rowId })
+}
+
+/** GET /reports/tasks/page — one filtered/sorted page of a row's tasks, for the in-app report view. */
+export function getReportPage(
+  rowId: string,
+  filters: DashboardFilters,
+  query: ReportPageQuery,
+  signal?: AbortSignal,
+): Promise<ReportPage> {
+  if (USE_MOCKS) return mock.getReportPage(rowId, filters, query)
+  const { columnFilters, ...rest } = query
+  const f = Object.fromEntries(Object.entries(columnFilters ?? {}).map(([k, v]) => [`f.${k}`, v]))
+  return getJson('/reports/tasks/page', { ...filterQuery(filters), ...rest, ...f, rowId }, signal)
 }
 
 /** GET /candidates/search?q= — the חיפוש מלש"ב box in the navbar. */
