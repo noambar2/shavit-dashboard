@@ -406,7 +406,7 @@ Return **only announcements that haven't expired** (`expiresAt` later than now),
 | `expiresAt` | When the banner disappears. The UI also hides an expired banner by itself, without a reload. |
 | `createdBy` | Shown to admins next to the expiry date. Fill it in from the logged-in user; don't trust a value from the client. |
 
-Regular users can hide a banner with ✕. That's remembered in their browser only, so the backend doesn't need to store it.
+Regular users can hide a banner with the eye button. It stays hidden only until the next page load, and nothing is stored, so the backend doesn't need to track it.
 
 ## 11. Announcements: create and edit (admins only)
 
