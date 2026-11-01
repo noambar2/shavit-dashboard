@@ -65,7 +65,7 @@ watch(query, (q) => {
   height: 48px;
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: clamp(12px, 3vw, 40px);
   padding: 0 24px;
   background: var(--surface);
   position: sticky;
@@ -87,6 +87,7 @@ watch(query, (q) => {
 }
 .tab {
   display: block;
+  white-space: nowrap;
   padding: 6px 22px;
   border-radius: var(--radius-sm);
   color: var(--darkest);

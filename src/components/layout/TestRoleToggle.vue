@@ -25,6 +25,7 @@ const { user, isAdmin } = storeToRefs(session)
 <style scoped>
 .test-toggle {
   display: flex;
+  white-space: nowrap;
   align-items: center;
   gap: 2px;
   padding: 2px 2px 2px 4px;

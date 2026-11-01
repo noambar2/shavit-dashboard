@@ -98,3 +98,39 @@ button {
   border-radius: 50%;
   flex: none;
 }
+
+/*
+ * Scroll areas that should make it obvious there's more to see:
+ * - an always-visible scrollbar (macOS hides scrollbars until you scroll). Styling ::-webkit-scrollbar
+ *   makes Chrome/Safari/Edge draw a permanent one; Firefox gets the standard thin scrollbar.
+ * - a soft shadow at the top/bottom edge, shown only while there's more content in that direction
+ *   (pure CSS: the white covers scroll with the content, the shadows stay put).
+ */
+.scroll-hint {
+  overflow-y: auto;
+  background:
+    linear-gradient(var(--surface) 30%, rgb(255 255 255 / 0)) center top,
+    linear-gradient(rgb(255 255 255 / 0), var(--surface) 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, rgb(7 25 56 / 14%), transparent) center top,
+    radial-gradient(farthest-side at 50% 100%, rgb(7 25 56 / 14%), transparent) center bottom;
+  background-repeat: no-repeat;
+  background-size: 100% 32px, 100% 32px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll;
+}
+.scroll-hint::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-hint::-webkit-scrollbar-thumb {
+  background: #b9c6d8;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+}
+.scroll-hint::-webkit-scrollbar-track {
+  background: transparent;
+}
+@supports not selector(::-webkit-scrollbar) {
+  .scroll-hint {
+    scrollbar-width: thin;
+    scrollbar-color: #b9c6d8 transparent;
+  }
+}

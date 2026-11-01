@@ -31,6 +31,7 @@ const emit = defineEmits<{ select: [key: string, id: string | undefined]; clear:
 
 const openSection = ref<string | null>(props.initiallyOpen ?? null)
 
+
 /** Keep the whole menu on screen: cap its height at the space left below where it opens. */
 const SCREEN_MARGIN = 12
 const root = ref<HTMLElement | null>(null)
@@ -62,7 +63,7 @@ function toggle(key: string) {
       <button type="button" class="link" @click="emit('clear')">נקה הכל</button>
     </div>
     <div v-if="loading" class="loading">טוען…</div>
-    <div v-else class="sections">
+    <div v-else class="sections scroll-hint">
       <section v-for="s in sections" :key="s.key" class="section">
         <button type="button" class="section-head" :aria-expanded="openSection === s.key" @click="toggle(s.key)">
           <span>
@@ -76,7 +77,7 @@ function toggle(key: string) {
             <AppIcon name="search" :size="14" />
             <input v-model="search[s.key]" type="search" placeholder="חיפוש" />
           </label>
-          <div class="options">
+          <div class="options scroll-hint">
             <label class="radio">
               <input type="radio" :name="`f-${s.key}`" :checked="!selected[s.key]" @change="emit('select', s.key, undefined)" />
               בחר הכל
