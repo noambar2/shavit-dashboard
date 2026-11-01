@@ -188,6 +188,19 @@ The ids for `taskStatus`, `indicatorRating` and `indicatorClassifications` **mus
 ```
 
 - Each series becomes one line. Its `label` is used in the legend and tooltip. Line colours are assigned by position: the first series is light blue, the second is dark blue.
+- The card opens on **ציונים** (`metric=scores`). In that mode, send exactly two series, with these keys:
+
+  ```json
+  {
+    "series": [
+      { "key": "score", "label": "ציון", "points": [{ "date": "2026-01-01", "value": 78 }] },
+      { "key": "parentScore", "label": "ציון אב", "points": [{ "date": "2026-01-01", "value": 84 }] }
+    ]
+  }
+  ```
+
+  The UI adds a third, dashed line, **ממוצע**, calculated as (ציון + ציון אב) ÷ 2 for each date. **Don't send it.**
+- In **משימות** mode (`metric=tasks`), send `tasks` (משימות) and `parentTasks` (משימות אב), as in the example above.
 - **Every series must have the same dates in the same order.** The x‑axis is taken from the first series.
 - You choose the time range and interval (daily, monthly, …) based on `date` and `dateGranularity`.
 

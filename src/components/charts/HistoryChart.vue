@@ -3,7 +3,7 @@
 import { computed, ref } from 'vue'
 import VChart from 'vue-echarts'
 import { getHistory } from '@/api/dashboard'
-import type { MetricMode } from '@/api/types'
+import type { HistorySeries, MetricMode } from '@/api/types'
 import { useDashboardData } from '@/composables/useFetch'
 import { axisText, tooltipBase } from '@/plugins/echarts'
 import { CARD_INFO, SERIES_COLORS } from '@/constants/colors'
@@ -11,13 +11,27 @@ import { formatNumber, formatShortDate } from '@/utils/format'
 import DashCard from '@/components/common/DashCard.vue'
 import MetricToggle from '@/components/common/MetricToggle.vue'
 
-const metric = ref<MetricMode>('tasks')
+const metric = ref<MetricMode>('scores')
 const { data, loading, error, reload } = useDashboardData(
   (filters, signal) => getHistory(filters, { metric: metric.value }, signal),
   [metric],
 )
 
-const series = computed(() => data.value?.series ?? [])
+/** In ציונים mode the UI adds a ממוצע line: (ציון + ציון אב) / 2 for each date. */
+const AVERAGE_KEY = 'average'
+
+const series = computed<HistorySeries[]>(() => {
+  const list = data.value?.series ?? []
+  const score = list.find((s) => s.key === 'score')
+  const parent = list.find((s) => s.key === 'parentScore')
+  if (metric.value !== 'scores' || !score || !parent) return list
+  const average: HistorySeries = {
+    key: AVERAGE_KEY,
+    label: 'ממוצע',
+    points: score.points.map((p, i) => ({ date: p.date, value: Math.round(((p.value + (parent.points[i]?.value ?? p.value)) / 2) * 10) / 10 })),
+  }
+  return [...list, average]
+})
 const dates = computed(() => series.value[0]?.points.map((p) => p.date) ?? [])
 
 const option = computed(() => ({
@@ -40,14 +54,15 @@ const option = computed(() => ({
     axisLine: { lineStyle: { color: '#e1ebf5' } },
     axisLabel: { ...axisText, margin: 14 },
   },
-  yAxis: { type: 'value', splitLine: { show: false }, axisLabel: axisText },
+  // Scores sit in a narrow band (e.g. 78–93); fit the axis to the data so the lines don't flatten at the top.
+  yAxis: { type: 'value', scale: metric.value === 'scores', max: metric.value === 'scores' ? 100 : undefined, splitLine: { show: false }, axisLabel: axisText },
   series: series.value.map((s, i) => ({
     name: s.label,
     type: 'line',
     smooth: 0.5,
     symbol: 'circle',
-    symbolSize: 8,
-    lineStyle: { width: 3, color: SERIES_COLORS[i] },
+    lineStyle: { width: s.key === AVERAGE_KEY ? 2 : 3, color: SERIES_COLORS[i], type: s.key === AVERAGE_KEY ? 'dashed' : 'solid' },
+    symbolSize: s.key === AVERAGE_KEY ? 6 : 8,
     itemStyle: { color: SERIES_COLORS[i] },
     data: s.points.map((p) => p.value),
   })),
@@ -66,7 +81,11 @@ const option = computed(() => ({
     </div>
 
     <ul class="legend">
-      <li v-for="(s, i) in series" :key="s.key"><span class="dot" :style="{ background: SERIES_COLORS[i] }" />{{ s.label }}</li>
+      <li v-for="(s, i) in series" :key="s.key">
+        <span v-if="s.key === AVERAGE_KEY" class="dash" :style="{ borderColor: SERIES_COLORS[i] }" />
+        <span v-else class="dot" :style="{ background: SERIES_COLORS[i] }" />
+        {{ s.label }}
+      </li>
     </ul>
   </DashCard>
 </template>
@@ -88,6 +107,10 @@ const option = computed(() => ({
   padding: 0;
   list-style: none;
   font-size: 13px;
+}
+.dash {
+  width: 14px;
+  border-top: 2px dashed;
 }
 .legend li {
   display: flex;

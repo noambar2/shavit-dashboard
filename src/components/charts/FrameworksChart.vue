@@ -19,7 +19,7 @@ const STACK: { key: TaskStatusKey; label: string }[] = [
   { key: 'paused', label: 'בהשהייה' },
 ]
 
-const metric = ref<MetricMode>('tasks')
+const metric = ref<MetricMode>('scores')
 const parentId = ref<string | null>(null)
 
 const { data, loading, error, reload } = useDashboardData(

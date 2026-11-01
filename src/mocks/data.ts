@@ -129,7 +129,7 @@ export const historyDates = ['2026-01-01', '2026-02-01', '2026-03-01', '2026-04-
 export const historyTasks = [2, 11, 7, 18, 14]
 export const historyParentTasks = [4, 9, 8.5, 8.5, 15.5]
 export const historyScores = [78, 84, 81, 90, 93]
-export const historyTargetScores = [85, 85, 85, 90, 90]
+export const historyParentScores = [84, 80, 86, 85, 89]
 
 // ---------------------------------------------------------------------------
 // Tasks table

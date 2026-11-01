@@ -33,7 +33,7 @@ import {
   historyParentTasks,
   historyScores,
   historyTasks,
-  historyTargetScores,
+  historyParentScores,
   indicators,
   kpis,
   taskRows,
@@ -126,7 +126,7 @@ export function getHistory(filters: DashboardFilters, params: { metric: MetricMo
     params.metric === 'scores'
       ? [
           { key: 'score', label: 'ציון', points: points(historyScores) },
-          { key: 'target', label: 'יעד', points: points(historyTargetScores) },
+          { key: 'parentScore', label: 'ציון אב', points: points(historyParentScores) },
         ]
       : [
           { key: 'tasks', label: 'משימות', points: points(historyTasks, f) },

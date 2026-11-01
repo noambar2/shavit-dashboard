@@ -18,7 +18,8 @@ export const CLASSIFICATION_COLORS: Record<ClassificationKey, string> = {
   routine: '#e04a5d',
 }
 
-export const SERIES_COLORS = ['#3d6deb', '#002a99']
+/** Line colours by position: 1st, 2nd, 3rd series (the 3rd is the ממוצע line in ציונים mode). */
+export const SERIES_COLORS = ['#3d6deb', '#002a99', '#12b8a6']
 
 /** Card-title ⓘ texts. Static for now — move to the API if they need to be editable. */
 export const CARD_INFO = {
