@@ -9,7 +9,7 @@ import VChart from 'vue-echarts'
 import { useFiltersStore } from '@/stores/filters'
 import { tooltipBase } from '@/plugins/echarts'
 import type { Distribution, FilterKey } from '@/api/types'
-import { formatNumber, formatPct } from '@/utils/format'
+import { COMPACT_FROM, formatCompact, formatNumber, formatPct } from '@/utils/format'
 import DashCard from '@/components/common/DashCard.vue'
 import HoverTip from '@/components/common/HoverTip.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
@@ -97,7 +97,11 @@ function onChartClick(e: { data?: unknown }) {
       <div class="chart">
         <VChart :option="option" autoresize @click="onChartClick" />
         <div v-if="showCenter && data" class="center">
-          <span class="num total">{{ formatNumber(data.total) }}</span>
+          <!-- Long totals are shortened (373K); hovering shows the exact number. -->
+          <HoverTip v-if="Math.abs(data.total) >= COMPACT_FROM" :text="formatNumber(data.total)" placement="top" :width="90">
+            <span class="num total compact" tabindex="0" :aria-label="formatNumber(data.total)">{{ formatCompact(data.total) }}</span>
+          </HoverTip>
+          <span v-else class="num total">{{ formatNumber(data.total) }}</span>
           <span v-if="data.changePct !== undefined" class="change" :class="data.changePct >= 0 ? 'up' : 'down'">
             <AppIcon :name="data.changePct >= 0 ? 'arrow-up' : 'arrow-down'" :size="11" />
             <span class="num">{{ Math.abs(data.changePct) }}%</span>
@@ -169,6 +173,10 @@ function onChartClick(e: { data?: unknown }) {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+.compact {
+  pointer-events: auto;
+  cursor: help;
 }
 .total {
   font-size: 16px;
