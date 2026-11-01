@@ -1,0 +1,99 @@
+/* Design tokens from the Figma "Palette" section */
+:root {
+  --main-blue: #0046fe;
+  --dark-blue: #002a99;
+  --darkest: #071938;
+  --text: #333c5d;
+  --text-medium: #68727d;
+  --text-light: rgb(51 60 93 / 50%);
+  --bg: #f5f8fb;
+  --surface: #ffffff;
+  --neutral-tint: #e1ebf5;
+  --border: #e6ecf3;
+  --selected-bg: #e5edff;
+
+  --graph-blue: #3d6deb;
+  --graph-dark-blue: #002a99;
+  --success: #12b8a6;
+  --warning: #f2b05c;
+  --error: #e04a5d;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow-pop: 0 4px 16px rgb(7 25 56 / 12%);
+  --font: 'Noto Sans Hebrew', system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--main-blue);
+  background: var(--selected-bg);
+}
+.icon-btn:hover {
+  background: #d6e2ff;
+}
+.icon-btn.plain {
+  background: transparent;
+  color: var(--text-medium);
+}
+.icon-btn.plain:hover {
+  background: var(--neutral-tint);
+}
+
+.popover {
+  position: absolute;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
