@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** מסגרות — stacked bars per framework, click a bar to drill down. */
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import VChart from 'vue-echarts'
 import { getFrameworks } from '@/api/dashboard'
 import type { FrameworkItem, MetricMode, TaskStatusKey } from '@/api/types'
@@ -28,6 +28,21 @@ const { data, loading, error, reload } = useDashboardData(
 )
 
 const items = computed(() => data.value?.items ?? [])
+
+/** Each bar gets at least this many px; with more bars than fit, the chart scrolls sideways. */
+const MIN_BAR_SLOT = 64
+const plotWidth = computed(() => `max(100%, ${items.value.length * MIN_BAR_SLOT}px)`)
+
+/** Axis labels may use the whole slot under their bar (wider in full screen) before getting "…". */
+const plotEl = ref<HTMLElement | null>(null)
+const plotPx = ref(0)
+const observer = new ResizeObserver(([entry]) => (plotPx.value = entry.contentRect.width))
+watch(plotEl, (el, old) => {
+  if (old) observer.unobserve(old)
+  if (el) observer.observe(el)
+})
+onBeforeUnmount(() => observer.disconnect())
+const labelWidth = computed(() => Math.max(MIN_BAR_SLOT - 8, plotPx.value / Math.max(items.value.length, 1) - 10))
 const BAR_RADIUS = 5
 
 /** Rounds only the outer ends of each stack and puts the total label on the top segment. */
@@ -80,6 +95,26 @@ function scoreSeries(list: FrameworkItem[]) {
   ]
 }
 
+/** Legend for ציונים mode: bar colour by score. */
+const SCORE_LEGEND = [
+  { label: '90 ומעלה', color: '#12b8a6' },
+  { label: '70–89', color: '#f2b05c' },
+  { label: 'מתחת ל-70', color: '#e04a5d' },
+]
+
+/**
+ * Axis labels without the words every name shares ("לשכת גיוס ירושלים" → "ירושלים"),
+ * so they fit on one line. Tooltips keep the full name.
+ */
+const axisLabels = computed(() => {
+  const names = items.value.map((i) => i.name)
+  if (names.length < 2) return names
+  const words = names.map((n) => n.split(' '))
+  let common = 0
+  while (words.every((w) => w.length > common + 1 && w[common] === words[0][common])) common++
+  return words.map((w) => w.slice(common).join(' '))
+})
+
 function tooltip(params: { dataIndex: number }[]) {
   const item = items.value[params[0]?.dataIndex]
   if (!item) return ''
@@ -98,20 +133,20 @@ function tooltip(params: { dataIndex: number }[]) {
 }
 
 const option = computed(() => ({
-  grid: { top: 24, right: 8, bottom: 44, left: 32 },
+  // No Y axis labels: every bar already shows its value on top.
+  grid: { top: 22, right: 4, bottom: 26, left: 4 },
   tooltip: { ...tooltipBase, trigger: 'axis', axisPointer: { type: 'none' }, formatter: tooltip },
   xAxis: {
     type: 'category',
     inverse: true,
-    data: items.value.map((i) => i.name),
+    data: axisLabels.value,
     axisTick: { show: false },
     axisLine: { lineStyle: { color: '#e1ebf5' } },
-    axisLabel: { ...axisText, color: '#333c5d', fontSize: 13, interval: 0, width: 80, overflow: 'break', lineHeight: 16 },
+    axisLabel: { ...axisText, color: '#333c5d', fontSize: 12, interval: 0, overflow: 'truncate', ellipsis: '…', width: labelWidth.value },
   },
   yAxis: {
     type: 'value',
-    splitLine: { show: false },
-    axisLabel: axisText,
+    show: false,
     max: metric.value === 'scores' ? 100 : undefined,
   },
   series: metric.value === 'scores' ? scoreSeries(items.value) : stackedSeries(items.value),
@@ -124,37 +159,53 @@ function onBarClick(e: { dataIndex: number }) {
 </script>
 
 <template>
-  <DashCard title="מסגרות" :info="CARD_INFO.frameworks" :loading="loading" :error="error" @retry="reload">
+  <DashCard title="מסגרות" :info="CARD_INFO.frameworks" :loading="loading" :error="error" expandable @retry="reload">
     <template #actions>
       <MetricToggle v-model="metric" />
     </template>
 
-    <nav class="crumbs" aria-label="ניווט מסגרות">
-      <template v-for="(c, i) in data?.path ?? []" :key="c.id ?? 'root'">
-        <span v-if="i > 0" class="sep">/</span>
-        <span v-if="i === (data?.path.length ?? 0) - 1 && i > 0" class="crumb current">{{ c.name }}</span>
-        <button v-else type="button" class="crumb" @click="parentId = c.id">{{ c.name }}</button>
-      </template>
-    </nav>
-
-    <div class="chart" :class="{ clickable: items.some((i) => i.hasChildren) }">
-      <VChart :option="option" autoresize @click="onBarClick" />
+    <!-- Breadcrumb and legend share one row, to leave the most room for the bars. -->
+    <div class="subhead">
+      <nav class="crumbs" aria-label="ניווט מסגרות">
+        <template v-for="(c, i) in data?.path ?? []" :key="c.id ?? 'root'">
+          <span v-if="i > 0" class="sep">/</span>
+          <span v-if="i === (data?.path.length ?? 0) - 1 && i > 0" class="crumb current">{{ c.name }}</span>
+          <button v-else type="button" class="crumb" @click="parentId = c.id">{{ c.name }}</button>
+        </template>
+      </nav>
+      <ul class="legend">
+        <template v-if="metric === 'tasks'">
+          <li v-for="s in STACK" :key="s.key"><span class="dot" :style="{ background: STATUS_COLORS[s.key] }" />{{ s.label }}</li>
+        </template>
+        <template v-else>
+          <li v-for="l in SCORE_LEGEND" :key="l.label"><span class="dot" :style="{ background: l.color }" />{{ l.label }}</li>
+        </template>
+      </ul>
     </div>
 
-    <ul v-if="metric === 'tasks'" class="legend">
-      <li v-for="s in STACK" :key="s.key"><span class="dot" :style="{ background: STATUS_COLORS[s.key] }" />{{ s.label }}</li>
-    </ul>
+    <div class="chart" :class="{ clickable: items.some((i) => i.hasChildren) }">
+      <div ref="plotEl" class="plot" :style="{ width: plotWidth }">
+        <VChart :option="option" autoresize @click="onBarClick" />
+      </div>
+    </div>
   </DashCard>
 </template>
 
 <style scoped>
+.subhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 4px 0 6px;
+  min-height: 20px;
+}
 .crumbs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 4px 0 8px;
   font-size: 13px;
-  min-height: 20px;
 }
 .crumb {
   color: var(--darkest);
@@ -172,18 +223,36 @@ button.crumb:hover {
 .chart {
   height: 210px;
 }
+.fullscreen .chart {
+  flex: 1;
+  height: auto;
+}
+/* Scrolls sideways when the bars need more room than the card has. */
+.chart {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.plot {
+  height: 100%;
+  min-height: 0;
+}
 .legend {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin: 8px 0 0;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--text-medium);
 }
 .legend li {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+}
+.legend .dot {
+  width: 8px;
+  height: 8px;
 }
 </style>

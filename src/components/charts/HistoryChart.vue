@@ -70,16 +70,12 @@ const option = computed(() => ({
 </script>
 
 <template>
-  <DashCard title="התפתחות היסטורית" :info="CARD_INFO.history" :loading="loading" :error="error" @retry="reload">
+  <DashCard title="התפתחות היסטורית" :info="CARD_INFO.history" :loading="loading" :error="error" expandable @retry="reload">
     <template #actions>
       <MetricToggle v-model="metric" />
     </template>
 
-    <div class="spacer" />
-    <div class="chart">
-      <VChart :option="option" autoresize />
-    </div>
-
+    <!-- Legend on top (same row height as the frameworks breadcrumb, so the plots line up). -->
     <ul class="legend">
       <li v-for="(s, i) in series" :key="s.key">
         <span v-if="s.key === AVERAGE_KEY" class="dash" :style="{ borderColor: SERIES_COLORS[i] }" />
@@ -87,26 +83,36 @@ const option = computed(() => ({
         {{ s.label }}
       </li>
     </ul>
+    <div class="chart">
+      <VChart :option="option" autoresize />
+    </div>
   </DashCard>
 </template>
 
 <style scoped>
-/* Lines the plot up with the frameworks chart, which has a breadcrumb row here. */
-.spacer {
-  flex: none;
-  height: 28px;
-}
 .chart {
   height: 210px;
 }
+.fullscreen .chart {
+  flex: 1;
+  height: auto;
+}
 .legend {
   display: flex;
-  justify-content: center;
-  gap: 20px;
-  margin: 8px 0 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  margin: 4px 0 6px;
+  min-height: 20px;
+  align-items: center;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--text-medium);
+}
+.legend .dot {
+  width: 8px;
+  height: 8px;
 }
 .dash {
   width: 14px;

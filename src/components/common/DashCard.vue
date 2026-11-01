@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
 import HoverTip from './HoverTip.vue'
 
@@ -8,12 +9,22 @@ defineProps<{
   info?: string
   loading?: boolean
   error?: string | null
+  /** Adds a button that opens the card full screen (Esc or the backdrop closes it). */
+  expandable?: boolean
 }>()
 defineEmits<{ retry: [] }>()
+
+const fullscreen = ref(false)
+const onKey = (e: KeyboardEvent) => e.key === 'Escape' && (fullscreen.value = false)
+watch(fullscreen, (on) => (on ? document.addEventListener('keydown', onKey) : document.removeEventListener('keydown', onKey)))
+onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <section class="card">
+  <section class="card" :class="{ fullscreen }">
+    <Teleport to="body">
+      <div v-if="fullscreen" class="card-backdrop" @click="fullscreen = false" />
+    </Teleport>
     <header class="head">
       <h2 class="title">
         {{ title }}
@@ -23,7 +34,18 @@ defineEmits<{ retry: [] }>()
           </button>
         </HoverTip>
       </h2>
-      <div class="actions"><slot name="actions" /></div>
+      <div class="actions">
+        <slot name="actions" />
+        <button
+          v-if="expandable"
+          type="button"
+          class="icon-btn plain"
+          :aria-label="fullscreen ? 'סגירת מסך מלא' : 'מסך מלא'"
+          @click="fullscreen = !fullscreen"
+        >
+          <AppIcon :name="fullscreen ? 'collapse' : 'expand'" :size="18" />
+        </button>
+      </div>
     </header>
     <div class="body">
       <slot />
@@ -44,6 +66,19 @@ defineEmits<{ retry: [] }>()
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+.card.fullscreen {
+  position: fixed;
+  z-index: 61;
+  inset: 32px;
+  padding: 20px 24px;
+  box-shadow: var(--shadow-pop);
+}
+.card-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(7 25 56 / 30%);
 }
 .head {
   display: flex;

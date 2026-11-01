@@ -30,6 +30,16 @@ export const filterOptions: FilterOptions = {
     { id: 'haifa', label: 'לשכת גיוס חיפה' },
     { id: 'beer-sheva', label: 'לשכת גיוס באר שבע' },
     { id: 'tiberias', label: 'לשכת גיוס טבריה' },
+    { id: 'beit-shemesh', label: 'לשכת גיוס בית שמש' },
+    { id: 'netanya', label: 'לשכת גיוס נתניה' },
+    { id: 'ashdod', label: 'לשכת גיוס אשדוד' },
+    { id: 'rishon', label: 'לשכת גיוס ראשון לציון' },
+    { id: 'kiryat-shmona', label: 'לשכת גיוס קריית שמונה' },
+    { id: 'eilat', label: 'לשכת גיוס אילת' },
+    { id: 'afula', label: 'לשכת גיוס עפולה' },
+    { id: 'hadera', label: 'לשכת גיוס חדרה' },
+    { id: 'petah-tikva', label: 'לשכת גיוס פתח תקווה' },
+    { id: 'nazareth', label: 'לשכת גיוס נצרת' },
   ],
   professionalFields: [
     { id: 'medical-summons', label: 'רפואי - זימונים' },
@@ -89,7 +99,7 @@ export interface FrameworkNode {
 }
 
 const leafGroups = (prefix: string, seed: number): FrameworkNode[] =>
-  ['חו"ל', 'או"ם', 'מיצוי', 'השתמטות', 'זימון', 'זימון מיוחד'].map((name, i) => {
+  ['חו"ל', 'או"ם', 'מיצוי', 'השתמטות', 'זימון', 'זימון מיוחד', 'צווי 12', 'מלש"בים', 'הכרזות מעמד', 'נפקדים', 'ועדות רפואיות', 'דחיות שירות'].map((name, i) => {
     const s = (seed + i * 7) % 11
     return {
       id: `${prefix}-g${i}`,
@@ -102,18 +112,20 @@ const leafGroups = (prefix: string, seed: number): FrameworkNode[] =>
 const departments = (prefix: string, seed: number): FrameworkNode[] =>
   ['מדור תו"ם', 'מדור מיון', 'מדור קליטה', 'מדור פרט', 'מדור רפואה'].map((name, i) => {
     const children = leafGroups(`${prefix}-d${i}`, seed + i)
-    return { id: `${prefix}-d${i}`, name, children, ...sumNodes(children) }
+    return { id: `${prefix}-d${i}`, name, children, ...sumNodes(children, seed * 5 + i) }
   })
 
 export const frameworksRoot: FrameworkNode[] = filterOptions.orgUnits.map((unit, i) => {
   const children = departments(unit.id, i * 3)
-  return { id: unit.id, name: unit.label, children, ...sumNodes(children) }
+  return { id: unit.id, name: unit.label, children, ...sumNodes(children, i) }
 })
 
-function sumNodes(nodes: FrameworkNode[]): Pick<FrameworkNode, 'breakdown' | 'score'> {
+/** Sums the children; `spread` nudges the averaged score so parents don't all land on the same number. */
+function sumNodes(nodes: FrameworkNode[], spread = 0): Pick<FrameworkNode, 'breakdown' | 'score'> {
   const breakdown = { treatment: 0, nearBreach: 0, breach: 0, paused: 0 }
   for (const n of nodes) for (const k of Object.keys(breakdown) as TaskStatusKey[]) breakdown[k] += n.breakdown[k]
-  const score = Math.round(nodes.reduce((a, n) => a + n.score, 0) / nodes.length)
+  const avg = nodes.reduce((a, n) => a + n.score, 0) / nodes.length
+  const score = Math.max(40, Math.min(100, Math.round(avg + ((spread * 37) % 41) - 18)))
   return { breakdown, score }
 }
 
@@ -171,6 +183,19 @@ export const taskRows: TaskRow[] = [
       }),
       row('zimun-medical', 'ועדות רפואיות', [211, 148, 850, 1, 1210, 30, 4, 74], { indicatorId: 'ind-medical', trendPct: 2 }),
     ],
+  }),
+  // More groups, so there's enough to scroll in the table (also in full screen).
+  ...['גיוס', 'מיון', 'קליטה', 'עתודה', 'שוחררים', 'רפואה', 'פרט', 'משמעת'].map((name, g) => {
+    const children = ['א', 'ב', 'ג'].map((suffix, c) => {
+      const k = (g * 3 + c) % 7
+      const [t, n, b, p] = [30 + k * 11, 60 + k * 17, 400 + k * 133, k % 3 === 0 ? 1 : 0]
+      return row(`g${g}-c${c}`, `${name} - ${suffix}`, [t, n, b, p, t + n + b + p, 14 + k * 5, 2 + (k % 4), 55 + ((k * 13) % 45)], {
+        indicatorId: `ind-g${g}-c${c}`,
+        trendPct: k % 2 ? null : k - 3,
+      })
+    })
+    const sum = (key: 'treatment' | 'nearBreach' | 'breach' | 'paused' | 'total') => children.reduce((a, c) => a + c[key], 0)
+    return row(`g${g}`, name, [sum('treatment'), sum('nearBreach'), sum('breach'), sum('paused'), sum('total'), null, 5, 60 + ((g * 17) % 40)], { children })
   }),
 ]
 

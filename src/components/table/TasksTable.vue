@@ -124,9 +124,6 @@ function toggleColumn(id: ColumnId) {
   hidden.value = next
 }
 
-// --- fullscreen ------------------------------------------------------------------
-const fullscreen = ref(false)
-
 // --- Excel export: דוח שמי for a lowest-level row, דוח מרוכז for a row with children ---
 const report = useReportExport()
 const reportLabel = (row: TaskRow) => (row.children?.length ? 'דוח מרוכז' : 'דוח שמי')
@@ -140,8 +137,7 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
 </script>
 
 <template>
-  <div v-if="fullscreen" class="backdrop" @click="fullscreen = false" />
-  <DashCard title="משימות" :loading="loading" :error="error" :class="{ fullscreen }" class="tasks" @retry="reload">
+  <DashCard title="משימות" :loading="loading" :error="error" expandable class="tasks" @retry="reload">
     <template #actions>
       <div ref="columnsEl" class="columns-anchor">
         <button type="button" class="icon-btn" :aria-expanded="columnsOpen" aria-label="בחירת עמודות" @click="columnsOpen = !columnsOpen">
@@ -176,9 +172,6 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
           @clear="columnFilters = {}"
         />
       </div>
-      <button type="button" class="icon-btn plain" :aria-label="fullscreen ? 'סגירת מסך מלא' : 'מסך מלא'" @click="fullscreen = !fullscreen">
-        <AppIcon :name="fullscreen ? 'collapse' : 'expand'" :size="18" />
-      </button>
     </template>
 
     <div class="table-wrap">
@@ -255,22 +248,6 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
 </template>
 
 <style scoped>
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgb(7 25 56 / 30%);
-}
-.tasks.fullscreen {
-  position: fixed;
-  z-index: 61;
-  inset: 40px 40px auto;
-  max-height: calc(100vh - 80px);
-  box-shadow: var(--shadow-pop);
-}
-.tasks.fullscreen .table-wrap {
-  max-height: calc(100vh - 160px);
-}
 .filters-anchor {
   position: relative;
 }

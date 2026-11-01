@@ -182,10 +182,6 @@ const dialog = ref<Announcement | 'new' | null>(null)
     flex: 1;
     min-height: 110px;
   }
-  /* The spacer only lines the history plot up with the frameworks plot when they sit side by side. */
-  .history :deep(.spacer) {
-    display: none;
-  }
 }
 
 /* Narrow screens: everything in one column. */
