@@ -11,7 +11,8 @@ export function useDashboardData<T>(
   loader: (filters: DashboardFilters, signal: AbortSignal) => Promise<T>,
   deps: WatchSource[] = [],
 ) {
-  const { filters, refreshKey } = storeToRefs(useFiltersStore())
+  const store = useFiltersStore()
+  const { filters, refreshKey } = storeToRefs(store)
   const data = shallowRef<T | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -23,12 +24,17 @@ export function useDashboardData<T>(
     controller = current
     loading.value = true
     error.value = null
+    store.pending++
     try {
       const result = await loader(filters.value, current.signal)
-      if (!current.signal.aborted) data.value = result
+      if (!current.signal.aborted) {
+        data.value = result
+        store.lastUpdated = new Date()
+      }
     } catch (e) {
       if (!current.signal.aborted) error.value = e instanceof Error ? e.message : String(e)
     } finally {
+      store.pending--
       if (controller === current) loading.value = false
     }
   }

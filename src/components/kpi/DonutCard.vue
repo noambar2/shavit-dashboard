@@ -115,8 +115,8 @@ function onChartClick(e: { data?: unknown }) {
   justify-content: space-between;
   gap: 12px;
   height: 100%;
-  min-height: 120px;
-  padding-top: 8px;
+  min-height: 92px;
+  padding-top: 4px;
 }
 .legend {
   list-style: none;
@@ -157,8 +157,8 @@ function onChartClick(e: { data?: unknown }) {
 }
 .chart {
   position: relative;
-  width: 108px;
-  height: 108px;
+  width: 88px;
+  height: 88px;
   flex: none;
 }
 .center {
@@ -171,7 +171,7 @@ function onChartClick(e: { data?: unknown }) {
   pointer-events: none;
 }
 .total {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--darkest);
 }

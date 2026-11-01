@@ -40,7 +40,7 @@ defineEmits<{ retry: [] }>()
 .card {
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 16px 20px 20px;
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -57,7 +57,7 @@ defineEmits<{ retry: [] }>()
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--darkest);
 }
@@ -74,6 +74,8 @@ defineEmits<{ retry: [] }>()
   position: relative;
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .overlay {
   position: absolute;

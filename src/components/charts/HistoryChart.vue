@@ -74,10 +74,11 @@ const option = computed(() => ({
 <style scoped>
 /* Lines the plot up with the frameworks chart, which has a breadcrumb row here. */
 .spacer {
-  height: 32px;
+  flex: none;
+  height: 28px;
 }
 .chart {
-  height: 240px;
+  height: 210px;
 }
 .legend {
   display: flex;

@@ -22,10 +22,11 @@ export function toQueryString(query: Query = {}): string {
   return qs ? `?${qs}` : ''
 }
 
-async function request(path: string, query?: Query, signal?: AbortSignal): Promise<Response> {
+async function request(path: string, query?: Query, signal?: AbortSignal, init: RequestInit = {}): Promise<Response> {
   const res = await fetch(`${BASE_URL}${path}${toQueryString(query)}`, {
     signal,
     credentials: 'include',
+    ...init,
   })
   if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`)
   return res
@@ -36,9 +37,16 @@ export async function getJson<T>(path: string, query?: Query, signal?: AbortSign
   return (await res.json()) as T
 }
 
-export async function getBlob(path: string, query?: Query): Promise<{ blob: Blob; filename?: string }> {
-  const res = await request(path, query)
-  const disposition = res.headers.get('Content-Disposition') ?? ''
-  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)
-  return { blob: await res.blob(), filename: match ? decodeURIComponent(match[1]) : undefined }
+/** POST / PUT a JSON body and read the JSON response. */
+export async function sendJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T> {
+  const res = await request(path, undefined, undefined, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return (await res.json()) as T
+}
+
+export async function deleteRequest(path: string): Promise<void> {
+  await request(path, undefined, undefined, { method: 'DELETE' })
 }

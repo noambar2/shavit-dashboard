@@ -1,6 +1,6 @@
 # מלש"ביה Dashboard — API Contract
 
-This is everything the frontend needs from the backend. The UI already works against fake data. Once these endpoints exist, set `VITE_USE_MOCKS=false` and it switches over with no code changes.
+This is everything the frontend needs from the backend (12 endpoints). The UI already works against fake data. Once these endpoints exist, set `VITE_USE_MOCKS=false` and it switches over with no code changes.
 
 - **TypeScript source of truth:** [`src/api/types.ts`](src/api/types.ts)
 - **Where each endpoint is called:** [`src/api/dashboard.ts`](src/api/dashboard.ts)
@@ -11,9 +11,9 @@ This is everything the frontend needs from the backend. The UI already works aga
 | Topic | Rule |
 | --- | --- |
 | Base URL | All paths below are relative to `VITE_API_BASE_URL` (default `/api`). |
-| Method | Everything is `GET`. |
+| Method | Everything is `GET`, except creating, editing and deleting announcements (sections 10–12). |
 | Format | JSON, UTF‑8. Field names are camelCase. |
-| Dates | `YYYY-MM-DD`. |
+| Dates | `YYYY-MM-DD`. Announcement timestamps are full ISO date-times (`2026-11-08T21:59:59.999Z`). |
 | Percentages | Plain numbers: `12` means 12%. Negative = decrease. |
 | Labels | Hebrew display labels come from the backend (`label`, `name`), so wording can change without a frontend release. |
 | Auth | Requests are sent with `credentials: 'include'` (cookies). Tell the frontend if you need a bearer token instead; it's a single change in `src/api/http.ts`. |
@@ -242,7 +242,7 @@ The ids for `taskStatus`, `indicatorRating` and `indicatorClassifications` **mus
 | `weightPct` | משקל, shown as "5%". |
 | `score` | ציון (0–100), coloured green, orange or red. `null` shows as "-". |
 | `trendPct` | מגמה, shown as "+4%" or "-8%". `null` shows as "-". |
-| `hasReport` | Shows the Excel icon in the דוח שמי column (section 7). |
+| `hasReport` | Shows the Excel icon in the ייצוא לאקסל column (section 7): a דוח שמי for lowest-level rows, a דוח מרוכז for rows with children. |
 
 The tree can be any depth. Search, collapse and column hiding all happen in the browser, so there's no need for paging or sorting parameters.
 
@@ -265,16 +265,82 @@ The tree can be any depth. Search, collapse and column hiding all happen in the 
 
 `description` = מהות המדד, `handling` = טיפול במדד, `classification` = סיווג המדד, `professionalField` = תחום מקצועי, `penalty` = קנס. `note` is optional.
 
-## 7. דוח שמי (named report download)
+## 7. Excel export: דוח שמי and דוח מרוכז
 
-`GET /reports/named?{filters}&rowId={row id}`
+`GET /reports/tasks?{filters}&rowId={row id}`. Called when the user clicks the Excel icon in the "ייצוא לאקסל" column.
 
-- Return the file itself (preferably `.xlsx`) with a `Content-Disposition` header so the browser saves it under the right name:
-  ```
-  Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-  Content-Disposition: attachment; filename*=UTF-8''%D7%93%D7%95%D7%97.xlsx
-  ```
-- If there's no filename header, the UI falls back to `{row name}.xlsx`.
+**The backend returns JSON, and the browser builds the `.xlsx` itself** (sheets, right-to-left layout, styling, links between sheets). That means no Excel library is needed on the server.
+
+What the user gets depends on the row:
+
+| Row clicked | File |
+| --- | --- |
+| Lowest-level row (no children) | **דוח שמי**: one sheet listing the row's tasks. |
+| Row with children, at any depth | **דוח מרוכז**: a summary sheet first, with the clicked row on top and **every** row under it below, indented by level, just like the table. Then one דוח שמי sheet for **each lowest-level row** under it. Each lowest-level name on the summary sheet links to its sheet, and each sheet links back. |
+
+The response has one entry in `rows` per lowest-level row under `rowId`. If `rowId` is itself lowest-level, there's just that one entry.
+
+```json
+{
+  "columns": [
+    { "key": "startDate", "label": "תאריך תחילה", "type": "date" },
+    { "key": "runDate", "label": "תאריך ריצה", "type": "date" },
+    { "key": "handlingDays", "label": "משך טיפול (ימים)", "type": "number" },
+    { "key": "daysToBreach", "label": "ימים לחריגה", "type": "number" },
+    { "key": "pauseEndDate", "label": "תאריך סיום השהייה", "type": "date" },
+    { "key": "pauseReason", "label": "סיבת השהייה", "type": "text" },
+    { "key": "personalNumber", "label": "מספר אישי", "type": "text" },
+    { "key": "track", "label": "מסלול עתודה / שוחרים", "type": "text" },
+    { "key": "corps", "label": "חיל", "type": "text" },
+    { "key": "major", "label": "מגמה", "type": "text", "width": 20 },
+    { "key": "position", "label": "משרה לאיוש", "type": "text", "width": 20 },
+    { "key": "studyStartDate", "label": "תאריך תחילת לימודים", "type": "date" }
+  ],
+  "rows": [
+    {
+      "rowId": "mitzui-tzav12",
+      "tasks": [
+        {
+          "startDate": "2026-10-02",
+          "runDate": "2026-11-01",
+          "handlingDays": 30,
+          "daysToBreach": -2,
+          "pauseEndDate": null,
+          "pauseReason": null,
+          "personalNumber": "5234567",
+          "track": "יעד",
+          "corps": "תקשוב",
+          "major": "הנדסת חשמל",
+          "position": "מהנדס/ת מערכות",
+          "studyStartDate": "2024-10-01"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**The columns are generic.** The backend decides which columns exist and in what order. To add a column (say, תאריך סיום לימודים), add it to `columns` and to each task. The frontend doesn't change.
+
+| `columns[]` field | Meaning |
+| --- | --- |
+| `key` | Name of the field in each task object. |
+| `label` | Column header in Excel. |
+| `type` | `date` (send `YYYY-MM-DD`; it becomes a real Excel date), `number` or `text`. **Send personal numbers as `text`** so leading zeros aren't lost. |
+| `width` | Optional column width. |
+
+**סוג משימה is always the first column, and the UI calculates it.** So every task **must** include `daysToBreach` and `pauseEndDate`, even if you don't list them as columns:
+
+| Condition (checked in this order) | סוג משימה |
+| --- | --- |
+| `pauseEndDate` is today or later | משימות בהשהייה |
+| `daysToBreach` < 0 | משימות בחריגה |
+| `daysToBreach` ≤ **5** | עתידות לחרוג |
+| otherwise | משימות לטיפול |
+
+The **5** is `NEAR_BREACH_DAYS` in `src/config.ts`. Change it there, and **use the same number on the server** when counting tasks for the dashboard, otherwise the dashboard and Excel won't agree.
+
+While the file is being built, the user sees "מרכזים עבורכם את הדוחות…". A failed request shows an error message with a retry option.
 
 ## 8. Navbar search (חיפוש מלש"ב)
 
@@ -287,6 +353,71 @@ The tree can be any depth. Search, collapse and column hiding all happen in the 
 ```
 
 Clicking a result goes to `/candidate/{id}`. That page isn't designed yet.
+
+## 9. Current user
+
+`GET /me`. Called once, when the page loads. The backend decides who is an admin, **based on the employee id**. The frontend never holds a list of admin ids.
+
+```json
+{ "employeeId": "7654321", "fullName": "ישראל ישראלי", "isAdmin": true }
+```
+
+- `isAdmin: true` shows the admin tools (the "הודעה חדשה" button, plus edit and delete on each announcement).
+- If this call fails, the dashboard still works, just without announcements or admin tools.
+
+## 10. Announcements: list
+
+`GET /announcements`. Called on page load and after every create, edit or delete.
+
+Return **only announcements that haven't expired** (`expiresAt` later than now), newest first:
+
+```json
+[
+  {
+    "id": "a1",
+    "title": "עדכון מערכת",
+    "message": "ביום חמישי בין 18:00 ל-20:00 המערכת תהיה בתחזוקה.",
+    "severity": "warning",
+    "createdAt": "2026-10-31T09:12:00.000Z",
+    "expiresAt": "2026-11-07T21:59:59.999Z",
+    "createdBy": { "employeeId": "1111111", "fullName": "מנהל מערכת" }
+  }
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `title` | Optional bold heading. |
+| `message` | The text, up to 500 characters. |
+| `severity` | `info` (blue banner) or `warning` (orange banner). |
+| `expiresAt` | When the banner disappears. The UI also hides an expired banner by itself, without a reload. |
+| `createdBy` | Shown to admins next to the expiry date. Fill it in from the logged-in user; don't trust a value from the client. |
+
+Regular users can hide a banner with ✕. That's remembered in their browser only, so the backend doesn't need to store it.
+
+## 11. Announcements: create and edit (admins only)
+
+`POST /announcements` creates one, and `PUT /announcements/{id}` edits one. Both take the same JSON body:
+
+```json
+{
+  "title": "עדכון מערכת",
+  "message": "ביום חמישי בין 18:00 ל-20:00 המערכת תהיה בתחזוקה.",
+  "severity": "warning",
+  "expiresAt": "2026-11-07T21:59:59.999Z"
+}
+```
+
+- `title` is optional. When editing, a missing `title` means "remove the title".
+- The admin picks a duration (a day, 3 days, a week, a month, or a specific date). The UI turns that into `expiresAt` = **the end of the chosen day** in the admin's local time, so the backend just stores what it receives.
+- Respond with the saved announcement, in the same shape as one item from section 10, with `id`, `createdAt` and `createdBy` filled in.
+- **Validate on the server too:** `message` must be 1–500 characters, `severity` must be `info` or `warning`, and `expiresAt` must be in the future.
+
+## 12. Announcements: delete (admins only)
+
+`DELETE /announcements/{id}`. Return any 2xx status. The body is ignored.
+
+**Security:** sections 11 and 12 must check on the server that the logged-in user is an admin, and return `403` if not. Hiding the buttons in the UI is not protection on its own.
 
 ---
 

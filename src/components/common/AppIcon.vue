@@ -13,13 +13,19 @@ export const PATHS = {
   close: 'M6 6l12 12M18 6 6 18',
   expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   collapse: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
-  columns: 'M5 4h3v16H5zM10.5 4h3v16h-3zM16 4h3v16h-3z',
+  columns: 'M3.5 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1zM9.5 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1zM15.5 5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1z',
   excel: 'M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4ZM14 3v4h4M9.5 11l5 6M14.5 11l-5 6',
   'arrow-up': 'M12 19V5M6 11l6-6 6 6',
   'arrow-down': 'M12 5v14M6 13l6 6 6-6',
+  plus: 'M12 5v14M5 12h14',
+  edit: 'M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
 } as const
 
 export type IconName = keyof typeof PATHS
+
+/** Icons drawn as solid shapes instead of outlines. */
+const FILLED = new Set<IconName>(['columns'])
 </script>
 
 <script setup lang="ts">
@@ -36,8 +42,8 @@ const props = defineProps({
     :width="props.size"
     :height="props.size"
     viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
+    :fill="FILLED.has(props.name) ? 'currentColor' : 'none'"
+    :stroke="FILLED.has(props.name) ? 'none' : 'currentColor'"
     stroke-width="2"
     stroke-linecap="round"
     stroke-linejoin="round"

@@ -42,8 +42,8 @@ function openPicker() {
 
 const label = computed(() => {
   const [y, m] = parse(date.value)
-  if (dateGranularity.value === 'year') return String(y)
-  if (dateGranularity.value === 'month') return `${MONTHS[m - 1]} ${y}`
+  if (dateGranularity.value === 'year') return `כל שנת ${y}`
+  if (dateGranularity.value === 'month') return `כל ${MONTHS[m - 1]} ${y}`
   return formatDate(date.value)
 })
 
@@ -120,6 +120,9 @@ const selectedYM = computed(() => parse(date.value))
           {{ c.day }}
         </button>
       </div>
+      <button v-if="mode === 'day'" type="button" class="whole" @click="pick(iso(viewYear, viewMonth, 1), 'month')">
+        הצגת כל {{ MONTHS[viewMonth] }}
+      </button>
 
       <div v-else-if="mode === 'month'" class="grid months">
         <button
@@ -133,6 +136,10 @@ const selectedYM = computed(() => parse(date.value))
           {{ m }}
         </button>
       </div>
+      <p v-if="mode === 'month'" class="hint">בחירת חודש מציגה את נתוני החודש כולו</p>
+      <button v-if="mode === 'month'" type="button" class="whole" @click="pick(iso(viewYear, 0, 1), 'year')">
+        הצגת כל שנת {{ viewYear }}
+      </button>
 
       <div v-else class="grid months">
         <button
@@ -146,6 +153,7 @@ const selectedYM = computed(() => parse(date.value))
           {{ y }}
         </button>
       </div>
+      <p v-if="mode === 'year'" class="hint">בחירת שנה מציגה את נתוני השנה כולה</p>
     </div>
   </div>
 </template>
@@ -165,6 +173,24 @@ const selectedYM = computed(() => parse(date.value))
   background: var(--surface);
   font-weight: 600;
   color: var(--darkest);
+}
+.whole {
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--main-blue);
+  font-weight: 600;
+}
+.whole:hover {
+  background: var(--selected-bg);
+}
+.hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--text-medium);
+  text-align: center;
 }
 .panel {
   top: calc(100% + 6px);

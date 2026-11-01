@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { downloadNamedReport, getTasks } from '@/api/dashboard'
-import type { TaskRow } from '@/api/types'
+import { computed, ref } from 'vue'
+import { getTasks } from '@/api/dashboard'
+import type { Option, TaskRow } from '@/api/types'
 import { useDashboardData } from '@/composables/useFetch'
 import { useClickOutside } from '@/composables/useClickOutside'
-import { useFiltersStore } from '@/stores/filters'
 import { formatNumber, scoreColor } from '@/utils/format'
 import DashCard from '@/components/common/DashCard.vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 import HoverTip from '@/components/common/HoverTip.vue'
+import FilterAccordion, { type FilterSection } from '@/components/filters/FilterAccordion.vue'
 import IndicatorTooltip from './IndicatorTooltip.vue'
+import ReportToast from './ReportToast.vue'
+import { useReportExport } from '@/composables/useReportExport'
 
 type ColumnId = 'treatment' | 'nearBreach' | 'breach' | 'paused' | 'total' | 'sla' | 'weightPct' | 'score' | 'trendPct' | 'report'
 
@@ -24,10 +25,9 @@ const COLUMNS: { id: ColumnId; label: string }[] = [
   { id: 'weightPct', label: 'משקל' },
   { id: 'score', label: 'ציון' },
   { id: 'trendPct', label: 'מגמה' },
-  { id: 'report', label: 'דוח שמי' },
+  { id: 'report', label: 'ייצוא לאקסל' },
 ]
 
-const { filters } = storeToRefs(useFiltersStore())
 const { data, loading, error, reload } = useDashboardData((f, signal) => getTasks(f, signal))
 
 // --- expand / collapse -------------------------------------------------------
@@ -39,27 +39,76 @@ function toggleRow(id: string) {
   collapsed.value = next
 }
 
-// --- row search (filter button) ---------------------------------------------
-const searchOpen = ref(false)
-const search = ref('')
-watch(searchOpen, (open) => !open && (search.value = ''))
+// --- column filters (filter button) ------------------------------------------
+// Generic: every column in COLUMNS (plus מסגרת) gets a section, with options taken
+// from the values in the data, so a new column is filterable without extra code.
+type FilterColumnId = 'name' | Exclude<ColumnId, 'report'>
+const FILTER_COLUMNS: { id: FilterColumnId; label: string }[] = [
+  { id: 'name', label: 'מסגרת' },
+  ...COLUMNS.filter((c): c is { id: Exclude<ColumnId, 'report'>; label: string } => c.id !== 'report'),
+]
 
-function matches(row: TaskRow, term: string): boolean {
-  return row.name.includes(term) || !!row.children?.some((c) => matches(c, term))
+const columnFilters = ref<Record<string, string | undefined>>({})
+const activeFilters = computed(() =>
+  Object.entries(columnFilters.value).filter((e): e is [FilterColumnId, string] => e[1] !== undefined),
+)
+const filtersOpen = ref(false)
+const filtersEl = ref<HTMLElement | null>(null)
+useClickOutside(filtersEl, () => (filtersOpen.value = false))
+
+/** The value as shown in the table — filters compare on exactly this text. */
+const display = (row: TaskRow, id: FilterColumnId) => (id === 'name' ? row.name : cell(row, id))
+
+const allRows = computed(() => {
+  const flat: TaskRow[] = []
+  const walk = (rows: TaskRow[]) => rows.forEach((r) => (flat.push(r), r.children && walk(r.children)))
+  walk(data.value?.rows ?? [])
+  return flat
+})
+
+/** Numbers sort numerically, text alphabetically, "-" last. */
+function sortValues(values: string[]): string[] {
+  const num = (v: string) => Number(v.replace(/[,%+]/g, ''))
+  return values.sort((a, b) => {
+    if (a === '-' || b === '-') return a === '-' ? 1 : -1
+    const na = num(a)
+    const nb = num(b)
+    return Number.isNaN(na) || Number.isNaN(nb) ? a.localeCompare(b, 'he') : na - nb
+  })
 }
 
-const visibleRows = computed(() => {
-  const term = search.value.trim()
-  const out: { row: TaskRow; depth: number }[] = []
-  const walk = (rows: TaskRow[], depth: number) => {
-    for (const row of rows) {
-      if (term && !matches(row, term)) continue
-      out.push({ row, depth })
-      if (row.children && (term || !collapsed.value.has(row.id))) walk(row.children, depth + 1)
+const filterSections = computed<FilterSection[]>(() =>
+  FILTER_COLUMNS.map((c) => {
+    const values = sortValues([...new Set(allRows.value.map((r) => display(r, c.id)))])
+    return {
+      key: c.id,
+      title: c.label,
+      searchable: c.id === 'name' || values.length > 8,
+      options: values.map((v): Option => ({ id: v, label: v })),
     }
-  }
-  walk(data.value?.rows ?? [], 0)
-  return out
+  }),
+)
+
+function setColumnFilter(key: string, value: string | undefined) {
+  columnFilters.value = { ...columnFilters.value, [key]: value }
+}
+
+const matchesFilters = (row: TaskRow) => activeFilters.value.every(([id, value]) => display(row, id) === value)
+
+/**
+ * Rows to render. While filtering, a row shows if it matches every active filter; its parents
+ * stay visible (marked `context`, drawn faded) so the tree still makes sense.
+ */
+const visibleRows = computed(() => {
+  const filtering = activeFilters.value.length > 0
+  const walk = (rows: TaskRow[], depth: number): { row: TaskRow; depth: number; context: boolean }[] =>
+    rows.flatMap((row) => {
+      const kids = row.children ? walk(row.children, depth + 1) : []
+      if (!filtering) return [{ row, depth, context: false }, ...(collapsed.value.has(row.id) ? [] : kids)]
+      const self = matchesFilters(row)
+      return self || kids.length ? [{ row, depth, context: !self }, ...kids] : []
+    })
+  return walk(data.value?.rows ?? [], 0)
 })
 
 // --- column picker -------------------------------------------------------------
@@ -78,20 +127,9 @@ function toggleColumn(id: ColumnId) {
 // --- fullscreen ------------------------------------------------------------------
 const fullscreen = ref(false)
 
-// --- report download ---------------------------------------------------------------
-const downloading = ref<string | null>(null)
-async function download(row: TaskRow) {
-  downloading.value = row.id
-  try {
-    const { blob, filename } = await downloadNamedReport(row.id, filters.value)
-    const url = URL.createObjectURL(blob)
-    const a = Object.assign(document.createElement('a'), { href: url, download: filename ?? `${row.name}.xlsx` })
-    a.click()
-    URL.revokeObjectURL(url)
-  } finally {
-    downloading.value = null
-  }
-}
+// --- Excel export: דוח שמי for a lowest-level row, דוח מרוכז for a row with children ---
+const report = useReportExport()
+const reportLabel = (row: TaskRow) => (row.children?.length ? 'דוח מרוכז' : 'דוח שמי')
 
 function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
   const v = row[id]
@@ -105,7 +143,6 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
   <div v-if="fullscreen" class="backdrop" @click="fullscreen = false" />
   <DashCard title="משימות" :loading="loading" :error="error" :class="{ fullscreen }" class="tasks" @retry="reload">
     <template #actions>
-      <input v-if="searchOpen" v-model="search" class="row-search" type="search" placeholder="חיפוש מסגרת" autofocus />
       <div ref="columnsEl" class="columns-anchor">
         <button type="button" class="icon-btn" :aria-expanded="columnsOpen" aria-label="בחירת עמודות" @click="columnsOpen = !columnsOpen">
           <AppIcon name="columns" :size="16" />
@@ -117,9 +154,28 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
           </label>
         </div>
       </div>
-      <button type="button" class="icon-btn" :aria-pressed="searchOpen" aria-label="חיפוש בטבלה" @click="searchOpen = !searchOpen">
-        <AppIcon name="filter" :size="16" />
-      </button>
+      <div ref="filtersEl" class="filters-anchor">
+        <button
+          type="button"
+          class="icon-btn"
+          :class="{ on: activeFilters.length }"
+          :aria-expanded="filtersOpen"
+          aria-label="סינון הטבלה"
+          @click="filtersOpen = !filtersOpen"
+        >
+          <AppIcon name="filter" :size="16" />
+          <span v-if="activeFilters.length" class="badge">{{ activeFilters.length }}</span>
+        </button>
+        <FilterAccordion
+          v-if="filtersOpen"
+          class="table-filter"
+          :sections="filterSections"
+          :selected="columnFilters"
+          initially-open="name"
+          @select="setColumnFilter"
+          @clear="columnFilters = {}"
+        />
+      </div>
       <button type="button" class="icon-btn plain" :aria-label="fullscreen ? 'סגירת מסך מלא' : 'מסך מלא'" @click="fullscreen = !fullscreen">
         <AppIcon :name="fullscreen ? 'collapse' : 'expand'" :size="18" />
       </button>
@@ -134,9 +190,9 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="{ row, depth } in visibleRows" :key="row.id">
+          <tr v-for="{ row, depth, context } in visibleRows" :key="row.id" :class="{ context }">
             <td class="name-col">
-              <span class="name" :style="{ paddingInlineStart: `${depth * 28}px` }">
+              <span class="name" :style="{ paddingInlineStart: `${depth * 20}px` }">
                 <button
                   v-if="row.children?.length"
                   type="button"
@@ -157,16 +213,17 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
             </td>
             <td v-for="c in shownColumns" :key="c.id" class="num-cell">
               <template v-if="c.id === 'report'">
-                <button
-                  v-if="row.hasReport"
-                  type="button"
-                  class="report"
-                  :disabled="downloading === row.id"
-                  :aria-label="`הורדת דוח שמי ${row.name}`"
-                  @click="download(row)"
-                >
-                  <AppIcon name="excel" :size="18" />
-                </button>
+                <HoverTip v-if="row.hasReport" :text="reportLabel(row)" placement="top" :width="90">
+                  <button
+                    type="button"
+                    class="report"
+                    :disabled="report.busy.value"
+                    :aria-label="`ייצוא ${reportLabel(row)} לאקסל: ${row.name}`"
+                    @click="report.exportRow(row)"
+                  >
+                    <AppIcon name="excel" :size="18" />
+                  </button>
+                </HoverTip>
               </template>
               <span
                 v-else-if="c.id === 'score'"
@@ -182,12 +239,19 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
             </td>
           </tr>
           <tr v-if="!loading && !visibleRows.length">
-            <td :colspan="shownColumns.length + 1" class="empty">אין נתונים להצגה</td>
+            <td :colspan="shownColumns.length + 1" class="empty">
+              <template v-if="activeFilters.length">
+                אין שורות שמתאימות לסינון ·
+                <button type="button" class="clear-filters" @click="columnFilters = {}">ניקוי הסינון</button>
+              </template>
+              <template v-else>אין נתונים להצגה</template>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
   </DashCard>
+  <ReportToast :status="report.status.value" @dismiss="report.dismiss" />
 </template>
 
 <style scoped>
@@ -206,16 +270,42 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
 }
 .tasks.fullscreen .table-wrap {
   max-height: calc(100vh - 160px);
-  overflow: auto;
 }
-.row-search {
-  height: 30px;
-  width: 180px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
+.filters-anchor {
+  position: relative;
+}
+.filters-anchor .icon-btn {
+  position: relative;
+}
+.icon-btn.on {
+  background: var(--main-blue);
+  color: #fff;
+}
+.badge {
+  position: absolute;
+  top: -4px;
+  inset-inline-end: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 999px;
-  outline: none;
-  font-size: 13px;
+  background: var(--error);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+}
+/* Toolbar sits at the left edge of the card, so open the menu towards the right. */
+.table-filter {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+  z-index: 20;
+}
+tr.context td {
+  opacity: 0.45;
+}
+.clear-filters {
+  color: var(--main-blue);
+  text-decoration: underline;
 }
 .columns-anchor {
   position: relative;
@@ -240,24 +330,28 @@ function cell(row: TaskRow, id: Exclude<ColumnId, 'report'>): string {
   accent-color: var(--main-blue);
 }
 .table-wrap {
+  flex: 1;
+  min-height: 0;
   margin-top: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  overflow: auto;
 }
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 13px;
 }
 thead th {
   position: sticky;
   top: 0;
+  z-index: 1;
   background: var(--bg);
   color: var(--text-medium);
   font-weight: 400;
   font-size: 12px;
-  padding: 10px 12px;
-  white-space: nowrap;
+  padding: 8px 6px;
+  line-height: 1.25;
   text-align: center;
 }
 thead th:first-child {
@@ -272,7 +366,7 @@ td.name-col {
   padding-inline-start: 16px;
 }
 td {
-  padding: 9px 12px;
+  padding: 7px 8px;
   color: var(--darkest);
 }
 tbody tr:hover td {

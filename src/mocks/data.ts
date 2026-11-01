@@ -162,7 +162,13 @@ export const taskRows: TaskRow[] = [
   }),
   row('zimun', 'זימון', [512, 288, 1950, 1, 2751, null, 10, 81], {
     children: [
-      row('zimun-first', 'צו ראשון', [301, 140, 1100, 0, 1541, 14, 6, 88], { indicatorId: 'ind-first' }),
+      // Three levels deep, to show how a דוח מרוכז handles grandchildren.
+      row('zimun-first', 'צו ראשון', [301, 140, 1100, 0, 1541, 14, 6, 88], {
+        children: [
+          row('zimun-first-jlm', 'צו ראשון - ירושלים', [180, 80, 650, 0, 910, 14, 3, 91], { indicatorId: 'ind-first' }),
+          row('zimun-first-hfa', 'צו ראשון - חיפה', [121, 60, 450, 0, 631, 14, 3, 84], { indicatorId: 'ind-first' }),
+        ],
+      }),
       row('zimun-medical', 'ועדות רפואיות', [211, 148, 850, 1, 1210, 30, 4, 74], { indicatorId: 'ind-medical', trendPct: 2 }),
     ],
   }),
@@ -201,3 +207,15 @@ export const candidates: CandidateSearchResult[] = Array.from({ length: 60 }, (_
   fullName: `${firstNames[i % firstNames.length]} ${lastNames[(i * 7) % lastNames.length]}`,
   idNumber: String(300_000_000 + i * 104_729).slice(0, 9),
 }))
+
+// ---------------------------------------------------------------------------
+// Named report (דוח שמי) task lines
+// ---------------------------------------------------------------------------
+
+export const reportValues = {
+  tracks: ['יעד', 'פעמי עתידים'],
+  corps: ['חיל האוויר', 'חיל הים', 'אמ"ן', 'תקשוב', 'הנדסה קרבית', 'שריון'],
+  majors: ['הנדסת חשמל', 'הנדסת מכונות', 'מדעי המחשב', 'הנדסת תעשייה וניהול', 'הנדסה אזרחית'],
+  positions: ['מהנדס/ת מערכות', 'קצין/ת תקשוב', 'מפתח/ת תוכנה', 'מהנדס/ת חשמל', 'מנהל/ת פרויקטים'],
+  pauseReasons: ['המתנה למסמכים', 'ועדה רפואית', 'שהייה בחו"ל', 'ערעור בתהליך'],
+}

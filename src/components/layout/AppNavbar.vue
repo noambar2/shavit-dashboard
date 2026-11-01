@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { searchCandidates } from '@/api/dashboard'
+import { searchCandidates, USE_MOCKS } from '@/api/dashboard'
 import type { CandidateSearchResult } from '@/api/types'
 import { useClickOutside } from '@/composables/useClickOutside'
 import AppIcon from '@/components/common/AppIcon.vue'
+import TestRoleToggle from './TestRoleToggle.vue'
 
 const TABS = [
   { to: '/', label: 'דף הבית' },
@@ -42,6 +43,7 @@ watch(query, (q) => {
         <RouterLink :to="tab.to" class="tab" active-class="" exact-active-class="active">{{ tab.label }}</RouterLink>
       </li>
     </ul>
+    <TestRoleToggle v-if="USE_MOCKS" class="test-toggle" />
     <div ref="searchEl" class="search">
       <AppIcon name="search" :size="16" class="search-icon" />
       <input v-model="query" type="search" placeholder='חיפוש מלש"ב' aria-label='חיפוש מלש"ב' @focus="open = true" />
@@ -60,7 +62,7 @@ watch(query, (q) => {
 
 <style scoped>
 .navbar {
-  height: 56px;
+  height: 48px;
   display: flex;
   align-items: center;
   gap: 40px;
@@ -71,7 +73,7 @@ watch(query, (q) => {
   z-index: 40;
 }
 .logo {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--main-blue);
   text-decoration: none;
@@ -97,6 +99,12 @@ watch(query, (q) => {
 .tab.active {
   background: var(--selected-bg);
   color: var(--main-blue);
+}
+.test-toggle {
+  margin-inline-start: auto;
+}
+.test-toggle + .search {
+  margin-inline-start: 0;
 }
 .search {
   position: relative;

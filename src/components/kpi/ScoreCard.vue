@@ -55,13 +55,13 @@ const option = computed(() => {
   display: grid;
   place-items: center;
   height: 100%;
-  min-height: 120px;
-  padding-top: 8px;
+  min-height: 92px;
+  padding-top: 4px;
 }
 .chart {
   position: relative;
-  width: 108px;
-  height: 108px;
+  width: 88px;
+  height: 88px;
 }
 .center {
   position: absolute;
@@ -72,7 +72,7 @@ const option = computed(() => {
   justify-content: center;
 }
 .value {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--darkest);
 }

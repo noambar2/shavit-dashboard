@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },
     build: {
-      // ECharts alone is ~550 kB; it's split into its own cached chunk below.
-      chunkSizeWarningLimit: 700,
+      // ECharts (~580 kB) and ExcelJS (~940 kB, loaded only when exporting) are big libraries in their own chunks.
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: { manualChunks: { echarts: ['echarts', 'vue-echarts', 'zrender'] } },
       },

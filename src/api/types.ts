@@ -174,7 +174,10 @@ export interface TaskRow {
   score: number | null
   /** מגמה, change in percent. `null` renders as "-". */
   trendPct: number | null
-  /** Whether a דוח שמי (named report) can be downloaded for this row. */
+  /**
+   * Whether this row can be exported to Excel: a lowest-level row exports its
+   * דוח שמי, a row with children exports a דוח מרוכז (see GET /reports/tasks).
+   */
   hasReport: boolean
   children?: TaskRow[]
 }
@@ -216,4 +219,79 @@ export interface CandidateSearchResult {
   fullName: string
   /** Personal / ID number, shown next to the name. */
   idNumber: string
+}
+
+// ---------------------------------------------------------------------------
+// Current user
+// ---------------------------------------------------------------------------
+
+/** GET /me — who is logged in. The backend decides `isAdmin` from the employee id. */
+export interface CurrentUser {
+  employeeId: string
+  fullName: string
+  isAdmin: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Announcements — banners on the home page, managed by admins
+// ---------------------------------------------------------------------------
+
+/** `info` = blue banner, `warning` = orange banner. */
+export type AnnouncementSeverity = 'info' | 'warning'
+
+/** One item from GET /announcements */
+export interface Announcement {
+  id: string
+  /** Optional bold heading before the message. */
+  title?: string
+  message: string
+  severity: AnnouncementSeverity
+  /** ISO date-time, e.g. `2026-11-08T21:59:59.000Z`. */
+  createdAt: string
+  /** ISO date-time. The announcement is hidden from this moment on. */
+  expiresAt: string
+  createdBy: { employeeId: string; fullName: string }
+}
+
+/** Body of POST /announcements and PUT /announcements/:id (admins only). */
+export interface AnnouncementInput {
+  title?: string
+  message: string
+  severity: AnnouncementSeverity
+  expiresAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Excel reports — דוח שמי (named) and דוח מרוכז (consolidated)
+// ---------------------------------------------------------------------------
+
+/** How a report column is written to Excel: dates become real date cells, numbers stay numeric. */
+export type ReportColumnType = 'text' | 'number' | 'date'
+
+/** One column of the דוח שמי. The backend decides which columns exist and in what order. */
+export interface ReportColumn {
+  /** Key of the value in each task object. */
+  key: string
+  /** Column header in Excel. */
+  label: string
+  type: ReportColumnType
+  /** Optional column width in Excel characters. */
+  width?: number
+}
+
+/**
+ * One task line: `{ [column.key]: value }`. Dates are `YYYY-MM-DD`, empty values are `null`.
+ * Every task MUST include `daysToBreach` and `pauseEndDate` (even if they aren't listed as
+ * columns), because the UI computes the סוג משימה column from them — see src/config.ts.
+ */
+export type ReportTask = Record<string, string | number | null>
+
+/**
+ * GET /reports/tasks?rowId=
+ * `columns` describes the דוח שמי sheets; `rows` has one entry per lowest-level row under
+ * `rowId` (or just `rowId` itself if it has no children).
+ */
+export interface ReportTasksResponse {
+  columns: ReportColumn[]
+  rows: { rowId: string; tasks: ReportTask[] }[]
 }

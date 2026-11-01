@@ -5,10 +5,13 @@
  * Set it to `false` and the same functions call the real endpoints below — no
  * component needs to change.
  */
-import { getBlob, getJson, type Query } from './http'
+import { deleteRequest, getJson, sendJson, type Query } from './http'
 import * as mock from '@/mocks/handlers'
 import type {
+  Announcement,
+  AnnouncementInput,
   CandidateSearchResult,
+  CurrentUser,
   DashboardFilters,
   FilterOptions,
   FrameworksResponse,
@@ -16,10 +19,11 @@ import type {
   IndicatorDetails,
   KpiSummary,
   MetricMode,
+  ReportTasksResponse,
   TasksResponse,
 } from './types'
 
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
+export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS !== 'false'
 
 /** Filters become query params, e.g. `?scope=all&date=2026-12-13&dateGranularity=day&taskStatus=breach` */
 function filterQuery(filters: DashboardFilters): Query {
@@ -70,17 +74,52 @@ export function getIndicator(id: string, signal?: AbortSignal): Promise<Indicato
   return getJson(`/indicators/${encodeURIComponent(id)}`, undefined, signal)
 }
 
-/** GET /reports/named?rowId= — the דוח שמי Excel file for a table row. */
-export function downloadNamedReport(
-  rowId: string,
-  filters: DashboardFilters,
-): Promise<{ blob: Blob; filename?: string }> {
-  if (USE_MOCKS) return mock.downloadNamedReport(rowId)
-  return getBlob('/reports/named', { ...filterQuery(filters), rowId })
+/**
+ * GET /reports/tasks?rowId= — task lines for the Excel export of a table row.
+ * The UI builds the .xlsx itself (דוח שמי for a lowest-level row, דוח מרוכז otherwise).
+ */
+export function getReportTasks(rowId: string, filters: DashboardFilters): Promise<ReportTasksResponse> {
+  if (USE_MOCKS) return mock.getReportTasks(rowId, filters)
+  return getJson('/reports/tasks', { ...filterQuery(filters), rowId })
 }
 
 /** GET /candidates/search?q= — the חיפוש מלש"ב box in the navbar. */
 export function searchCandidates(q: string, signal?: AbortSignal): Promise<CandidateSearchResult[]> {
   if (USE_MOCKS) return mock.searchCandidates(q)
   return getJson('/candidates/search', { q }, signal)
+}
+
+/** GET /me — the logged-in user, including whether they are an admin. */
+export function getCurrentUser(signal?: AbortSignal): Promise<CurrentUser> {
+  if (USE_MOCKS) return mock.getCurrentUser()
+  return getJson('/me', undefined, signal)
+}
+
+/** GET /announcements — announcements that haven't expired yet, newest first. */
+export function getAnnouncements(signal?: AbortSignal): Promise<Announcement[]> {
+  if (USE_MOCKS) return mock.getAnnouncements()
+  return getJson('/announcements', undefined, signal)
+}
+
+/** POST /announcements — admins only. Returns the saved announcement. */
+export function createAnnouncement(input: AnnouncementInput): Promise<Announcement> {
+  if (USE_MOCKS) return mock.createAnnouncement(input)
+  return sendJson('POST', '/announcements', input)
+}
+
+/** PUT /announcements/:id — admins only. Returns the saved announcement. */
+export function updateAnnouncement(id: string, input: AnnouncementInput): Promise<Announcement> {
+  if (USE_MOCKS) return mock.updateAnnouncement(id, input)
+  return sendJson('PUT', `/announcements/${encodeURIComponent(id)}`, input)
+}
+
+/** DELETE /announcements/:id — admins only. */
+export function deleteAnnouncement(id: string): Promise<void> {
+  if (USE_MOCKS) return mock.deleteAnnouncement(id)
+  return deleteRequest(`/announcements/${encodeURIComponent(id)}`)
+}
+
+/** Mock mode only: switch the fake user between admin and regular user (for testing). */
+export function setMockAdmin(isAdmin: boolean) {
+  if (USE_MOCKS) mock.setMockAdmin(isAdmin)
 }

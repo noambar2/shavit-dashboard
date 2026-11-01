@@ -36,6 +36,10 @@ export const useFiltersStore = defineStore('filters', () => {
   const options = ref<FilterOptions | null>(null)
   /** Bumped by the refresh button; data loaders watch it. */
   const refreshKey = ref(0)
+  /** When dashboard data was last fetched successfully (shown next to the refresh button). */
+  const lastUpdated = ref<Date | null>(null)
+  /** Number of dashboard requests in flight. */
+  const pending = ref(0)
 
   const filters = computed<DashboardFilters>(() => ({
     scope: scope.value,
@@ -89,6 +93,8 @@ export const useFiltersStore = defineStore('filters', () => {
     selected,
     options,
     refreshKey,
+    lastUpdated,
+    pending,
     filters,
     activeChips,
     loadOptions,

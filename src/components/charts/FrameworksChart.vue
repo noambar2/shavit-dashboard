@@ -170,7 +170,7 @@ button.crumb:hover {
   color: var(--text-medium);
 }
 .chart {
-  height: 240px;
+  height: 210px;
 }
 .legend {
   display: flex;

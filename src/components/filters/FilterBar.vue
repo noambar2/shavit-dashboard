@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useFiltersStore } from '@/stores/filters'
 import { useClickOutside } from '@/composables/useClickOutside'
 import type { Scope } from '@/api/types'
+import { formatDateTime } from '@/utils/format'
 import AppIcon from '@/components/common/AppIcon.vue'
 import FilterMenu from './FilterMenu.vue'
 import DatePicker from './DatePicker.vue'
@@ -15,7 +16,7 @@ const SCOPES: { id: Scope; label: string }[] = [
 ]
 
 const store = useFiltersStore()
-const { scope, activeChips } = storeToRefs(store)
+const { scope, activeChips, lastUpdated, pending } = storeToRefs(store)
 
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
@@ -54,9 +55,15 @@ onMounted(() => store.loadOptions())
 
       <button v-if="!activeChips.length" type="button" class="clear" @click="store.clearAll()">נקה הכל</button>
 
-      <button type="button" class="icon-btn refresh" aria-label="רענון נתונים" @click="store.refresh()">
-        <AppIcon name="refresh" :size="16" />
-      </button>
+      <div class="end">
+        <slot name="end" />
+        <span v-if="lastUpdated" class="updated" aria-live="polite">
+          {{ pending ? 'מרענן נתונים…' : 'נתונים עדכניים ל-' }}<span v-if="!pending" class="num">{{ formatDateTime(lastUpdated) }}</span>
+        </span>
+        <button type="button" class="icon-btn" :class="{ spinning: pending }" aria-label="רענון נתונים" @click="store.refresh()">
+          <AppIcon name="refresh" :size="16" />
+        </button>
+      </div>
     </div>
 
     <div v-if="activeChips.length" class="chips">
@@ -131,8 +138,24 @@ onMounted(() => store.loadOptions())
 .clear:hover {
   color: var(--main-blue);
 }
-.refresh {
+.end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-inline-start: auto;
+}
+.updated {
+  font-size: 12px;
+  color: var(--text-medium);
+  white-space: nowrap;
+}
+.spinning svg {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(-360deg);
+  }
 }
 .chips {
   display: flex;

@@ -4,8 +4,11 @@
  * would against a real backend. Delete this folder once the backend is live.
  */
 import type {
+  Announcement,
+  AnnouncementInput,
   BreadcrumbItem,
   CandidateSearchResult,
+  CurrentUser,
   DashboardFilters,
   Distribution,
   FilterOptions,
@@ -14,6 +17,9 @@ import type {
   IndicatorDetails,
   KpiSummary,
   MetricMode,
+  ReportColumn,
+  ReportTask,
+  ReportTasksResponse,
   TaskRow,
   TaskStatusKey,
   TasksResponse,
@@ -32,8 +38,10 @@ import {
   kpis,
   taskRows,
   toFrameworkItem,
+  reportValues,
   type FrameworkNode,
 } from './data'
+import * as announcements from './announcements'
 
 const STATUS_KEYS: TaskStatusKey[] = ['treatment', 'nearBreach', 'breach', 'paused']
 
@@ -157,13 +165,81 @@ export function getIndicator(id: string): Promise<IndicatorDetails> {
   return delay(indicators[id] ?? fallbackIndicator(id, name), 200)
 }
 
-export async function downloadNamedReport(rowId: string): Promise<{ blob: Blob; filename?: string }> {
+/** Small deterministic PRNG so each row always gets the same fake people. */
+function seeded(seedText: string) {
+  let h = 2166136261
+  for (const ch of seedText) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507)
+    h = Math.imul(h ^ (h >>> 13), 3266489909)
+    return ((h ^= h >>> 16) >>> 0) / 4294967296
+  }
+}
+
+function leavesOf(row: TaskRow): TaskRow[] {
+  return row.children?.length ? row.children.flatMap(leavesOf) : [row]
+}
+
+/** The columns the backend currently sends. Adding one here (and to the tasks) is all a new column needs. */
+const REPORT_COLUMNS: ReportColumn[] = [
+  { key: 'startDate', label: 'תאריך תחילה', type: 'date' },
+  { key: 'runDate', label: 'תאריך ריצה', type: 'date' },
+  { key: 'handlingDays', label: 'משך טיפול (ימים)', type: 'number' },
+  { key: 'daysToBreach', label: 'ימים לחריגה', type: 'number' },
+  { key: 'pauseEndDate', label: 'תאריך סיום השהייה', type: 'date' },
+  { key: 'pauseReason', label: 'סיבת השהייה', type: 'text' },
+  { key: 'personalNumber', label: 'מספר אישי', type: 'text' },
+  { key: 'track', label: 'מסלול עתודה / שוחרים', type: 'text' },
+  { key: 'corps', label: 'חיל', type: 'text' },
+  { key: 'major', label: 'מגמה', type: 'text', width: 20 },
+  { key: 'position', label: 'משרה לאיוש', type: 'text', width: 20 },
+  // Extra columns, to show the report adapts to whatever the backend sends:
+  { key: 'studyStartDate', label: 'תאריך תחילת לימודים', type: 'date' },
+  { key: 'studyEndDate', label: 'תאריך סיום לימודים', type: 'date' },
+]
+
+function fakeTasks(row: TaskRow, runDate: string): ReportTask[] {
+  const rand = seeded(row.id)
+  const pick = <T,>(list: T[]) => list[Math.floor(rand() * list.length)]
+  const [ry, rm, rd] = runDate.split('-').map(Number)
+  const run = new Date(ry, rm - 1, rd)
+  // Local calendar day (toISOString would shift it by the timezone).
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const count = 12 + Math.floor(rand() * 18)
+  return Array.from({ length: count }, () => {
+    const handlingDays = 1 + Math.floor(rand() * 45)
+    const start = new Date(run)
+    start.setDate(run.getDate() - handlingDays)
+    const paused = rand() < 0.08
+    const pauseEnd = new Date(run)
+    pauseEnd.setDate(run.getDate() + 3 + Math.floor(rand() * 20))
+    const studyStart = new Date(run.getFullYear() - 1 - Math.floor(rand() * 3), 9, 1)
+    const studyEnd = new Date(studyStart.getFullYear() + 3 + Math.floor(rand() * 2), 6, 30)
+    return {
+      startDate: iso(start),
+      runDate,
+      handlingDays,
+      daysToBreach: (row.sla ?? 30) - handlingDays,
+      pauseEndDate: paused ? iso(pauseEnd) : null,
+      pauseReason: paused ? pick(reportValues.pauseReasons) : null,
+      personalNumber: String(5_000_000 + Math.floor(rand() * 4_000_000)),
+      track: pick(reportValues.tracks),
+      corps: pick(reportValues.corps),
+      major: pick(reportValues.majors),
+      position: pick(reportValues.positions),
+      studyStartDate: iso(studyStart),
+      studyEndDate: iso(studyEnd),
+    }
+  })
+}
+
+export function getReportTasks(rowId: string, filters: DashboardFilters): Promise<ReportTasksResponse> {
   const row = findRow(taskRows, (r) => r.id === rowId)
-  const header = 'שם,מספר אישי,סטטוס,ימים פתוחים'
-  const lines = candidates.slice(0, 20).map((c, i) => `${c.fullName},${c.idNumber},${['לטיפול', 'עתידה לחרוג', 'בחריגה'][i % 3]},${(i * 3) % 40}`)
-  // The real backend should return an .xlsx file; the mock returns CSV (with BOM so Excel reads Hebrew).
-  const blob = new Blob(['﻿' + [header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
-  return delay({ blob, filename: `דוח שמי - ${row?.name ?? rowId}.csv` }, 300)
+  if (!row) return Promise.reject(new Error('404 Not Found'))
+  const rows = leavesOf(row).map((leaf) => ({ rowId: leaf.id, tasks: fakeTasks(leaf, filters.date) }))
+  // A bit slower than other calls, so the "preparing your report" message is visible.
+  return delay({ columns: REPORT_COLUMNS, rows }, 900 + rows.length * 150)
 }
 
 export function searchCandidates(q: string): Promise<CandidateSearchResult[]> {
@@ -171,3 +247,28 @@ export function searchCandidates(q: string): Promise<CandidateSearchResult[]> {
   const results = term ? candidates.filter((c) => c.fullName.includes(term) || c.idNumber.startsWith(term)) : []
   return delay(results.slice(0, 8), 150)
 }
+
+export function getCurrentUser(): Promise<CurrentUser> {
+  return delay(announcements.mockUser, 100)
+}
+
+export function getAnnouncements(): Promise<Announcement[]> {
+  return delay(announcements.active(), 150)
+}
+
+export async function createAnnouncement(input: AnnouncementInput): Promise<Announcement> {
+  await delay(null, 300)
+  return announcements.create(input)
+}
+
+export async function updateAnnouncement(id: string, input: AnnouncementInput): Promise<Announcement> {
+  await delay(null, 300)
+  return announcements.update(id, input)
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  await delay(null, 250)
+  announcements.remove(id)
+}
+
+export const setMockAdmin = announcements.setMockAdmin

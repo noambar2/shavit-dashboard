@@ -23,3 +23,9 @@ export function scoreColor(score: number | null): string {
   if (score >= 70) return 'var(--warning)'
   return 'var(--error)'
 }
+
+/** Date → `01/11/2026 14:32` */
+export function formatDateTime(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
