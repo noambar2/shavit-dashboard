@@ -10,33 +10,25 @@ import {
 } from '@/api/dashboard'
 import type { Announcement, AnnouncementInput, CurrentUser } from '@/api/types'
 
-const DISMISSED_KEY = 'dismissed-announcements'
-
-function loadDismissed(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? '[]') as string[]
-  } catch {
-    return []
-  }
-}
-
 /** The logged-in user and the home-page announcements. */
 export const useSessionStore = defineStore('session', () => {
   const user = ref<CurrentUser | null>(null)
   const announcements = ref<Announcement[]>([])
-  const dismissed = ref<string[]>(loadDismissed())
+  /** Announcements a regular user hid. In memory only, so they come back on the next page load. */
+  const hidden = ref<string[]>([])
   /** Ticks every minute so announcements disappear on time without a reload. */
   const now = ref(Date.now())
   setInterval(() => (now.value = Date.now()), 60_000)
 
   const isAdmin = computed(() => !!user.value?.isAdmin)
 
+  const activeAnnouncements = computed(() => announcements.value.filter((a) => new Date(a.expiresAt).getTime() > now.value))
+
   /** Admins always see every active announcement so they can manage them; others can hide ones they've read. */
   const visibleAnnouncements = computed(() =>
-    announcements.value.filter(
-      (a) => new Date(a.expiresAt).getTime() > now.value && (isAdmin.value || !dismissed.value.includes(a.id)),
-    ),
+    activeAnnouncements.value.filter((a) => isAdmin.value || !hidden.value.includes(a.id)),
   )
+  const hiddenCount = computed(() => activeAnnouncements.value.length - visibleAnnouncements.value.length)
 
   async function load() {
     const [me, list] = await Promise.all([getCurrentUser(), getAnnouncements()])
@@ -65,13 +57,12 @@ export const useSessionStore = defineStore('session', () => {
     if (user.value) user.value = { ...user.value, isAdmin }
   }
 
-  function dismiss(id: string) {
-    dismissed.value = [...dismissed.value, id]
-    try {
-      localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed.value))
-    } catch {
-      /* storage unavailable — stays hidden until reload */
-    }
+  function hide(id: string) {
+    hidden.value = [...hidden.value, id]
+  }
+
+  function showHidden() {
+    hidden.value = []
   }
 
   return {
@@ -79,11 +70,13 @@ export const useSessionStore = defineStore('session', () => {
     isAdmin,
     announcements,
     visibleAnnouncements,
+    hiddenCount,
     load,
     reloadAnnouncements,
     saveAnnouncement,
     removeAnnouncement,
-    dismiss,
+    hide,
+    showHidden,
     setTestAdmin,
   }
 })

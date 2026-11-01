@@ -10,7 +10,7 @@ import AppIcon from '@/components/common/AppIcon.vue'
 const emit = defineEmits<{ edit: [announcement: Announcement] }>()
 
 const session = useSessionStore()
-const { visibleAnnouncements, isAdmin } = storeToRefs(session)
+const { visibleAnnouncements, hiddenCount, isAdmin } = storeToRefs(session)
 
 const confirmingDelete = ref<string | null>(null)
 const busy = ref<string | null>(null)
@@ -36,6 +36,10 @@ async function remove(id: string) {
 </script>
 
 <template>
+  <button v-if="hiddenCount" type="button" class="hidden-note" @click="session.showHidden()">
+    <AppIcon name="eye" :size="14" />
+    {{ hiddenCount === 1 ? 'הודעה אחת מוסתרת' : `${hiddenCount} הודעות מוסתרות` }} · הצגה
+  </button>
   <ul v-if="visibleAnnouncements.length" class="announcements" aria-label="הודעות">
     <li v-for="a in visibleAnnouncements" :key="a.id" class="banner" :class="a.severity" role="status">
       <!-- Filled shape + white glyph reads as a status marker, not a button. -->
@@ -73,8 +77,15 @@ async function remove(id: string) {
             </button>
           </template>
         </template>
-        <button v-else type="button" class="icon-btn plain" aria-label="הסתרת הודעה" @click="session.dismiss(a.id)">
-          <AppIcon name="close" :size="16" />
+        <button
+          v-else
+          type="button"
+          class="icon-btn plain"
+          aria-label="הסתרת ההודעה עד לרענון הדף"
+          title="הסתרה (תחזור ברענון)"
+          @click="session.hide(a.id)"
+        >
+          <AppIcon name="eye-off" :size="16" />
         </button>
       </div>
     </li>
@@ -82,6 +93,18 @@ async function remove(id: string) {
 </template>
 
 <style scoped>
+.hidden-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 2px 4px;
+  font-size: 12px;
+  color: var(--text-medium);
+}
+.hidden-note:hover {
+  color: var(--main-blue);
+}
 .announcements {
   list-style: none;
   margin: 0;

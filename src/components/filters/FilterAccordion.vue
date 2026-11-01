@@ -16,7 +16,7 @@ export interface FilterSection {
  * "בחר הכל" and (optionally) a search box. Purely presentational — callers pass the
  * sections and the current selection, and handle `select` / `clear`.
  */
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AppIcon from '@/components/common/AppIcon.vue'
 
 const props = defineProps<{
@@ -30,6 +30,19 @@ const props = defineProps<{
 const emit = defineEmits<{ select: [key: string, id: string | undefined]; clear: [] }>()
 
 const openSection = ref<string | null>(props.initiallyOpen ?? null)
+
+/** Keep the whole menu on screen: cap its height at the space left below where it opens. */
+const SCREEN_MARGIN = 12
+const root = ref<HTMLElement | null>(null)
+const maxHeight = ref<number | null>(null)
+function fitToScreen() {
+  if (root.value) maxHeight.value = Math.max(180, window.innerHeight - root.value.getBoundingClientRect().top - SCREEN_MARGIN)
+}
+onMounted(() => {
+  fitToScreen()
+  window.addEventListener('resize', fitToScreen)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', fitToScreen))
 const search = ref<Record<string, string>>({})
 
 function visibleOptions(s: FilterSection): Option[] {
@@ -43,7 +56,7 @@ function toggle(key: string) {
 </script>
 
 <template>
-  <div class="popover menu">
+  <div ref="root" class="popover menu" :style="maxHeight ? { maxHeight: `${maxHeight}px` } : undefined">
     <div class="menu-head">
       <span class="menu-title">סינון</span>
       <button type="button" class="link" @click="emit('clear')">נקה הכל</button>
@@ -91,7 +104,8 @@ function toggle(key: string) {
   flex-direction: column;
 }
 .sections {
-  max-height: min(480px, 70vh);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 .menu-head {
@@ -144,7 +158,7 @@ function toggle(key: string) {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 200px;
+  max-height: 168px;
   overflow-y: auto;
 }
 .radio {
