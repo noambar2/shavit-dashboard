@@ -157,8 +157,57 @@ const row = (
   return { id, name, treatment, nearBreach, breach, paused, total, sla, weightPct, score, trendPct: null, hasReport: true, ...extra }
 }
 
+/** A lowest-level indicator row with made-up but stable numbers (`k` varies them). */
+const leaf = (id: string, name: string, k: number): TaskRow => {
+  const [t, n, b, p] = [20 + ((k * 13) % 60), 15 + ((k * 7) % 40), 80 + ((k * 37) % 300), k % 4 === 0 ? 1 : 0]
+  return row(id, name, [t, n, b, p, t + n + b + p, 14 + ((k * 5) % 30), 1 + (k % 4), 50 + ((k * 17) % 50)], {
+    indicatorId: `ind-${id}`,
+    trendPct: k % 3 === 0 ? (k % 2 ? 3 : -5) : null,
+  })
+}
+
+/** A parent row whose counts are the sum of its children and whose score is their average. */
+const group = (id: string, name: string, children: TaskRow[]): TaskRow => {
+  const sum = (key: 'treatment' | 'nearBreach' | 'breach' | 'paused' | 'total' | 'weightPct') => children.reduce((a, c) => a + c[key], 0)
+  const scores = children.map((c) => c.score).filter((v): v is number => v !== null)
+  const score = scores.length ? Math.round(scores.reduce((a, v) => a + v, 0) / scores.length) : null
+  return row(id, name, [sum('treatment'), sum('nearBreach'), sum('breach'), sum('paused'), sum('total'), null, sum('weightPct'), score], { children })
+}
+
+/** ענף ← מדור ← משרד ← צוות ← מדד: five levels deep, to exercise the tree, filters and Excel export. */
+const deepBranch = group('anaf', 'ענף כוח אדם', [
+  group('anaf-gius', 'מדור גיוס', [
+    group('anaf-gius-jlm', 'משרד ירושלים', [
+      group('anaf-gius-jlm-miun', 'צוות מיון', [
+        leaf('anaf-gius-jlm-miun-1', 'ראיונות אישיים', 1),
+        leaf('anaf-gius-jlm-miun-2', 'מבחני מיון', 2),
+      ]),
+      group('anaf-gius-jlm-refua', 'צוות רפואה', [
+        leaf('anaf-gius-jlm-refua-1', 'בדיקות רפואיות', 3),
+        leaf('anaf-gius-jlm-refua-2', 'השלמת מסמכים', 4),
+        leaf('anaf-gius-jlm-refua-3', 'ועדות ערר', 5),
+      ]),
+    ]),
+    group('anaf-gius-hfa', 'משרד חיפה', [
+      group('anaf-gius-hfa-miun', 'צוות מיון', [
+        leaf('anaf-gius-hfa-miun-1', 'ראיונות אישיים', 6),
+        leaf('anaf-gius-hfa-miun-2', 'מבחני מיון', 7),
+      ]),
+    ]),
+    leaf('anaf-gius-bs', 'משרד באר שבע', 8),
+  ]),
+  group('anaf-klita', 'מדור קליטה', [
+    group('anaf-klita-north', 'משרד צפון', [
+      leaf('anaf-klita-north-1', 'שיבוץ ראשוני', 9),
+      leaf('anaf-klita-north-2', 'מעקב קליטה', 10),
+    ]),
+    leaf('anaf-klita-south', 'משרד דרום', 11),
+  ]),
+])
+
 export const taskRows: TaskRow[] = [
   row('tom', 'מדור תו"ם', [8371, 2008, 11059, 3, 21441, null, 15, 100]),
+  deepBranch,
   row('mitzui', 'מיצוי', [249, 406, 3700, 0, 4355, null, 0, 100], {
     children: [
       row('mitzui-tzav12', 'צווי 12', [42, 181, 1732, 0, 1955, 30, 5, 86], { indicatorId: 'ind-tzav12' }),

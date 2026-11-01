@@ -110,9 +110,11 @@ function addNamedSheet(
   meta: string,
   today: string,
   backLink?: string,
+  /** Sheet tab name, when it should differ from the row name (e.g. to tell apart rows with the same name). */
+  sheetTitle?: string,
 ) {
   const columns = [TASK_TYPE_COLUMN, ...backendColumns]
-  const ws = wb.addWorksheet(sheetName(wb, row.name), {
+  const ws = wb.addWorksheet(sheetName(wb, sheetTitle ?? row.name), {
     views: [{ rightToLeft: true, state: 'frozen', ySplit: NAMED_HEADER_ROW }],
   })
   addTitle(ws, `דוח שמי – ${row.name}`, `${meta} · ${tasks.length} משימות`)
@@ -196,9 +198,31 @@ function styleSummaryRow(ws: Worksheet, rowNumber: number, opts: { bold?: boolea
   if (opts.link) r.getCell(1).font = { name: FONT, bold: opts.bold, color: { argb: 'FF0046FE' }, underline: true }
 }
 
-/** Every row under `row`, depth-first, with its depth (1 = direct child). */
-function descendants(row: TaskRow, depth = 1): { row: TaskRow; depth: number }[] {
-  return (row.children ?? []).flatMap((c) => [{ row: c, depth }, ...descendants(c, depth + 1)])
+/** Every row under `row`, depth-first, with its depth (1 = direct child) and ancestors (closest first). */
+function descendants(row: TaskRow, depth = 1, ancestors: TaskRow[] = []): { row: TaskRow; depth: number; ancestors: TaskRow[] }[] {
+  const chain = [row, ...ancestors]
+  return (row.children ?? []).flatMap((c) => [{ row: c, depth, ancestors: chain }, ...descendants(c, depth + 1, chain)])
+}
+
+/**
+ * Sheet names for the lowest-level rows. A name used more than once gets the closest ancestor
+ * that tells the rows apart, e.g. "משרד ירושלים - ראיונות אישיים" vs "משרד חיפה - ראיונות אישיים".
+ */
+function leafSheetTitles(leaves: { row: TaskRow; ancestors: TaskRow[] }[]): Map<string, string> {
+  const titles = new Map<string, string>()
+  const byName = new Map<string, typeof leaves>()
+  for (const l of leaves) byName.set(l.row.name, [...(byName.get(l.row.name) ?? []), l])
+  for (const [name, group] of byName) {
+    if (group.length === 1) {
+      titles.set(group[0].row.id, name)
+      continue
+    }
+    const depth = Math.max(...group.map((g) => g.ancestors.length))
+    let level = 0
+    while (level < depth && new Set(group.map((g) => g.ancestors[level]?.name)).size < group.length) level++
+    for (const g of group) titles.set(g.row.id, g.ancestors[level] ? `${g.ancestors[level].name} - ${name}` : name)
+  }
+  return titles
 }
 
 // ---------------------------------------------------------------------------
@@ -250,10 +274,14 @@ export async function buildReport(
   styleHeader(summary, 9)
 
   let line = 10
-  for (const { row: child, depth } of descendants(row)) {
+  const rows = descendants(row)
+  const titles = leafSheetTitles(rows.filter((r) => isLeaf(r.row)))
+
+  for (const { row: child, depth } of rows) {
     const indent = '    '.repeat(depth - 1)
     if (isLeaf(child)) {
-      const sheet = addNamedSheet(wb, child, report.tasksByRow.get(child.id) ?? [], report.columns, meta, ctx.today, summary.name)
+      const title = titles.get(child.id) ?? child.name
+      const sheet = addNamedSheet(wb, child, report.tasksByRow.get(child.id) ?? [], report.columns, meta, ctx.today, summary.name, title)
       summary.getRow(line).values = summaryValues(child, { text: indent + child.name, hyperlink: linkTo(sheet) })
       styleSummaryRow(summary, line, { link: true })
     } else {
